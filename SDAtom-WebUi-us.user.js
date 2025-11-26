@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SDAtom-WebUi-us
 // @namespace    SDAtom-WebUi-us
-// @version      1.4.2
+// @version      1.4.3
 // @description  Queue for AUTOMATIC1111 WebUi and an option to saving settings
 // @author       Kryptortio
 // @homepage     https://github.com/Kryptortio/SDAtom-WebUi-us
@@ -360,33 +360,33 @@
 
         ui:{},
 		scriptSettings: {
-			defaultQuantity:{name:"Default queue quantity", description:"Default number of times to execute each queue item", type:"numeric",value:"1"},
-			rememberQueue:{name:"Remember queue", description:"Remember the queue if you reload the page", type:"boolean",value:true},
-			notificationSound:{name:"Notification sound", description:"Sound to be played when processing of queue items stops", type:"boolean",value:true},
-			extensionScript:{name:"Extension script(s)", description:"https://github.com/Kryptortio/SDAtom-WebUi-us#script-extensions", type:"text",value:""},
-			promptFilter:{name:"Prompt filter(s)", description:"https://github.com/Kryptortio/SDAtom-WebUi-us#prompt-filter", type:"text",value:""},
-			promptFilterNegative:{name:"Filter negative prompt", description:"Apply the prompt filter to the negative filter as well", type:"boolean",value:false},
-			autoscrollOutput:{name:"Autoscroll console", description:"Scroll console automatically when new lines appear", type:"boolean",value:true},
-			verboseLog:{name:"Verbose console", description:"Log as much as possible to the console", type:"boolean",value:false},
-			maxOutputLines:{name:"Max console lines", description:"The maximum number of lines that can be shown in the console box", type:"numeric",value:"500"},
-			overwriteQueueSettings1:{name:"Alt 1 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 1 button to add to queue (same format as in the queue)", type:"text",value:'{"width":"768","height":"768"}'},
-			overwriteQueueSettings2:{name:"Alt 2 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 2 button to add to queue (same format as in the queue)", type:"text",value:'{"width":"1024","height":"1024"}'},
-			overwriteQueueSettings3:{name:"Alt 3 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 3 button to add to queue (same format as in the queue)", type:"text",value:'{"sample":"20","sampleMethod":"Euler a","width":"512","height":"512","restoreFace": false,"tiling": false,"batchCount": "1","batchSize": "1","cfg": "7","seed": "-1","extra": false,  "varSeed": "-1","varStr": "0"}'},
-            buttonOpacity:{name:"Button transparency", description:"Change how visible the floating buttons in the corner should be", type:"numeric",value:0.7},
+			defaultQuantity:{name:"Default queue quantity", description:"Default number of times to execute each queue item", type:"numeric", value:1},
+			rememberQueue:{name:"Remember queue", description:"Remember the queue if you reload the page", type:"boolean", value:true},
+			stayReady:{name:"Stay ready", description:"Remain ready after end-of-queue until manually stopped", type:"boolean", value:false},
+			notificationSound:{name:"Notification sound", description:"Sound to be played when processing of queue items stops", type:"boolean", value:true},
+			extensionScript:{name:"Extension script(s)", description:"https://github.com/Kryptortio/SDAtom-WebUi-us#script-extensions", type:"text", value:""},
+			promptFilter:{name:"Prompt filter(s)", description:"https://github.com/Kryptortio/SDAtom-WebUi-us#prompt-filter", type:"text", value:""},
+			promptFilterNegative:{name:"Filter negative prompt", description:"Apply the prompt filter to the negative filter as well", type:"boolean", value:false},
+			autoscrollOutput:{name:"Autoscroll console", description:"Scroll console automatically when new lines appear", type:"boolean", value:true},
+			verboseLog:{name:"Verbose console", description:"Log as much as possible to the console", type:"boolean", value:false},
+			maxOutputLines:{name:"Max console lines", description:"The maximum number of lines that can be shown in the console box", type:"numeric", value:500},
+			overwriteQueueSettings1:{name:"Alt 1 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 1 button to add to queue (same format as in the queue)", type:"text", value:'{"width":"768","height":"768"}'},
+			overwriteQueueSettings2:{name:"Alt 2 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 2 button to add to queue (same format as in the queue)", type:"text", value:'{"width":"1024","height":"1024"}'},
+			overwriteQueueSettings3:{name:"Alt 3 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 3 button to add to queue (same format as in the queue)", type:"text", value:'{"sample":"20","sampleMethod":"Euler a","width":"512","height":"512","restoreFace": false,"tiling": false,"batchCount": "1","batchSize": "1","cfg": "7","seed": "-1","extra": false,  "varSeed": "-1","varStr": "0"}'},
+            buttonOpacity:{name:"Button transparency", description:"Change how visible the floating buttons in the corner should be", type:"numeric", value:0.7},
 		},
         savedSetting: JSON.parse(localStorage.awqSavedSetting || '{}'),
         currentQueue: JSON.parse(localStorage.awqCurrentQueue || '[]'),
     };
 
-	if(localStorage.hasOwnProperty("awqNotificationSound") &&
-		!localStorage.hasOwnProperty("awqScriptSettings")) { // Tmp settings migration
+	if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnProperty("awqScriptSettings")) { // Tmp settings migration
 		awqLog('Copying settings from old storage');
 		if (localStorage.hasOwnProperty("awqNotificationSound"))
-			conf.scriptSettings.notificationSound.value = localStorage.awqNotificationSound == 1 ? true : false;
+			conf.scriptSettings.notificationSound.value = localStorage.awqNotificationSound == 1;
 		if (localStorage.hasOwnProperty("awqAutoscrollOutput"))
-			conf.scriptSettings.autoscrollOutput.value = localStorage.awqAutoscrollOutput == 1 ? true : false;
+			conf.scriptSettings.autoscrollOutput.value = localStorage.awqAutoscrollOutput == 1;
 		if (localStorage.hasOwnProperty("awqVerboseLog"))
-			conf.scriptSettings.verboseLog.value = localStorage.awqVerboseLog == 1 ? true : false;
+			conf.scriptSettings.verboseLog.value = localStorage.awqVerboseLog == 1;
 		if (localStorage.hasOwnProperty("awqMaxOutputLines"))
 			conf.scriptSettings.maxOutputLines.value = localStorage.awqMaxOutputLines;
 		if (localStorage.hasOwnProperty("awqPromptFilter"))
@@ -992,16 +992,16 @@
 			ssElem.onchange = function() {
 				conf.scriptSettings[ssKey].value = ssObj.type == 'boolean' ? this.checked : this.value;
 				saveScriptSettings();
-			};
-			if(ssObj.type == 'boolean') ssElem.type = 'checkbox';
-			if(ssObj.type == 'numeric') {
+			}
+
+			if(ssObj.type == 'boolean') {
+                ssElem.type = 'checkbox';
+                ssElem.style.verticalAlign = 'middle';
+                ssElem.checked = ssObj.value;
+            } else if(ssObj.type == 'numeric') {
 				ssElem.type = 'number' ;
 				ssElem.inputmode = 'numeric';
 				ssElem.onkeypress = e => { if (e.key.match(/\D/g)) { e.preventDefault();} };
-			}
-			if(ssObj.type == 'boolean') {
-				ssElem.type = 'checkbox';
-				ssElem.checked = ssObj.value;
 			}
 
 			let cbLabel = document.createElement('label');
@@ -1010,9 +1010,7 @@
 			cbLabel.title = ssObj.description;
 
 			let ssElemContainer = document.createElement('span');
-
 			ssElemContainer.appendChild(cbLabel);
-
 
 			if(ssObj.description.match("http")) {
 				let helpLink = document.createElement('a');
@@ -1027,7 +1025,6 @@
 			}
 
 			ssElemContainer.appendChild(ssElem);
-
 			dialogBody.appendChild(ssElemContainer);
 		}
 
@@ -1255,13 +1252,13 @@
 	}
 
     function toggleProcessButton(p_set_processing) {
+        let oldState = conf.commonData.processing;
+        if(p_set_processing == null) p_set_processing = !oldState;
+        else if(p_set_processing == oldState || conf.scriptSettings.stayReady.value) return;
         awqLog('toggleProcessButton:' + p_set_processing);
-        let pb = conf.ui.processButton;
-        let undefinedInput = typeof p_set_processing == 'undefined';
 
-        if(undefinedInput) {
-            toggleProcessButton(!conf.commonData.processing);
-        } else if (p_set_processing) {
+        let pb = conf.ui.processButton;
+        if(p_set_processing) {
             awqLogPublishMsg('Processing <b>started</b>');
             conf.commonData.processing = true;
             pb.style.background = 'green';
@@ -1270,13 +1267,10 @@
             cogElem.innerHTML = '⚙️';
             cogElem.style.display = 'inline-block';
             pb.appendChild(cogElem);
-
-            //cogElem.animate([{ transform: 'rotate(0)' },{transform: 'rotate(360deg)'}], {duration: 1000,iterations: Infinity});
-
             executeAllNewTasks();
         } else {
             awqLogPublishMsg('Processing <b>ended</b>');
-            conf.commonData.processing = false;
+            conf.commonData.processing = conf.commonData.working = false;
             conf.commonData.previousTaskStartTime = null;
             pb.style.background = null;
             pb.innerHTML = c_processButtonText;
@@ -1322,10 +1316,13 @@
             conf.ui.container.style.display = newType === 'other' ? 'none' : '';
         }
 
-        // If no work is being done for a while disable queue
+        if(conf.commonData.processing && !conf.commonData.working && !conf.commonData.previousTaskStartTime)
+            executeAllNewTasks();
+
         if(conf.commonData.waiting || conf.commonData.working || !conf.commonData.processing)
             stuckProcessingCounter = 0;
-        else if(++stuckProcessingCounter > 30) {
+        else if(!conf.scriptSettings.stayReady.value && ++stuckProcessingCounter > 30) {
+            // If no work is being done for a while disable queue
             awqLog('updateStatus: stuck in processing queue status? Disabling queue processing');
             toggleProcessButton(false);
             stuckProcessingCounter = 0;
@@ -1333,46 +1330,49 @@
         }
     }
 
-    async function executeNewTask() {
-        awqLog('executeNewTask: working='+conf.commonData.working + ' processing=' + conf.commonData.processing);
-        if(conf.commonData.working) return; // Already working on task
-        if(!conf.commonData.processing) return; // Not proicessing queue
+    async function executeAllNewTasks() {
+        while(conf.commonData.processing) {
+            //awqLog('executeNewTask: working='+conf.commonData.working);
+            if(conf.commonData.working) return; // Already working on task
 
-        if(conf.commonData.previousTaskStartTime) {
-            let timeSpent = Date.now() - conf.commonData.previousTaskStartTime;
-            awqLogPublishMsg(`Completed work on queue item after ${Math.floor(timeSpent/1000/60)} minutes ${Math.round((timeSpent-Math.floor(timeSpent/60000)*60000)/1000)} seconds `);
-        }
+            if(conf.commonData.previousTaskStartTime) {
+                let timeSpent = Date.now() - conf.commonData.previousTaskStartTime;
+                awqLogPublishMsg(`Completed work on queue item after ${Math.floor(timeSpent/1000/60)} minutes ${Math.round((timeSpent-Math.floor(timeSpent/60000)*60000)/1000)} seconds`);
+            }
 
-        let queueItems = conf.ui.queueContainer.getElementsByTagName('div');
-        for(let i = 0; i < queueItems.length; i++) {
-            let itemQuantity = queueItems[i].querySelector('.AWQ-item-quantity');
-            let itemType = queueItems[i].querySelector('.AWQ-item-type').value;
-            if(itemQuantity.value > 0) {
-                awqLog('executeNewTask: found next work item with index ' + i + ', quantity ' + itemQuantity.value + ' and type ' + itemType);
-                await loadJson(queueItems[i].querySelector('.AWQ-item-JSON').value);
-                await clickStartButton(itemType);
-                conf.commonData.working = true;
-                itemQuantity.value = itemQuantity.value - 1;
-                itemQuantity.onchange();
-                awqLogPublishMsg(`Started working on ${itemType} queue item ${i+1} (${itemQuantity.value} more to go) `);
-                conf.commonData.previousTaskStartTime = Date.now();
-                await waitForTaskToComplete(itemType);
+            let queueItems = conf.ui.queueContainer.getElementsByTagName('div');
+            for(let i = 0; i < queueItems.length; i++) {
+                let itemQuantity = queueItems[i].querySelector('.AWQ-item-quantity');
+                let itemType = queueItems[i].querySelector('.AWQ-item-type').value;
+                if(itemQuantity.value > 0) {
+                    awqLog('executeNewTask: found next work item with index ' + i + ', quantity ' + itemQuantity.value + ' and type ' + itemType);
+                    conf.commonData.working = true;
+                    await loadJson(queueItems[i].querySelector('.AWQ-item-JSON').value);
+                    await clickStartButton(itemType);
+                    itemQuantity.value = itemQuantity.value - 1;
+                    itemQuantity.onchange();
+                    awqLogPublishMsg(`Started working on ${itemType} queue item ${i+1} (${itemQuantity.value} more to go) `);
+                    conf.commonData.previousTaskStartTime = Date.now();
+                    await waitForTaskToComplete(itemType);
+                    queueItems = true;
+                    break;
+                }
+            }
+
+            // No more tasks to process
+            if(queueItems !== true) {
+                if(conf.commonData.previousTaskStartTime) {
+                    conf.commonData.previousTaskStartTime = null;
+                    awqLog('executeNewTask: No more tasks found');
+                    playWorkCompleteSound();
+                    toggleProcessButton(false);
+                }
                 return;
             }
         }
-        conf.commonData.previousTaskStartTime = null;
-        awqLog('executeNewTask: No more tasks found');
-        toggleProcessButton(false); // No more tasks to process
-        playWorkCompleteSound();
     }
 
-    async function executeAllNewTasks() {
-        while(conf.commonData.processing) {
-            await executeNewTask();
-        }
-    }
-
-    function playWorkCompleteSound() { if(conf.scriptSettings.notificationSound.value) c_audio_base64.play();}
+    function playWorkCompleteSound() { if(conf.scriptSettings.notificationSound.value) c_audio_base64.play(); }
 
     function editSetting() {
         let settingStorage = conf.ui.settingsStorage;
@@ -1499,10 +1499,8 @@
         const c_max_time_to_wait = 100;
         let targetButton = conf[conf.commonData.activeType].controls.genrateButton.el;
         awqLog(`clickStartButton: working ${conf.commonData.working} waiting ${conf.commonData.working} type ${p_type}`);
-        if(conf.commonData.working || conf.commonData.waiting) return;
-
+        if(conf.commonData.waiting) return;
         targetButton.click();
-
         conf.commonData.waiting = true;
         return new Promise(resolve => {
             let retryCount = 0;
@@ -1545,7 +1543,7 @@
 
         let targetTabConf = p_tabConfig.filter( (elem) => { return elem.name == p_targetTabName })[0];
         function correctTabVisible() {
-            return conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display == 'none' ? false : true;
+            return conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display != 'none';
         }
 
         if(correctTabVisible()) return;
@@ -1582,15 +1580,13 @@
 
     function waitForTaskToComplete(p_itemType) {
         awqLog(`waitForTaskToComplete: Waiting to complete work for ${p_itemType}`);
-
         conf.commonData.waiting = true;
         return new Promise(resolve => {
             let waitForCompleteInterval = setInterval(function() {
                 if(webUICurrentyWorkingOn(p_itemType)) return;
                 clearInterval(waitForCompleteInterval);
                 awqLog(`Work is complete for ${p_itemType}`);
-                conf.commonData.waiting = false;
-                conf.commonData.working = false;
+                conf.commonData.waiting = conf.commonData.working = false;
                 resolve();
             },c_wait_tick_duration);
         });
@@ -1718,14 +1714,14 @@
 
         if(type == 'ext') { // Needs special saving since it's not an input but a tab switch
             valueJSON.extrasMode = conf.ext.controls.extrasMode.filter((elem) => {
-                return conf.shadowDOM.root.querySelector(elem.containerSel).style.display == 'none' ? false : true
+                return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
             })[0].name;
             valueJSON.extrasResizeMode = conf.ext.controls.extrasResizeMode.filter((elem) => {
-                return conf.shadowDOM.root.querySelector(elem.containerSel).style.display == 'none' ? false : true
+                return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
             })[0].name;
         } else if(type == 'i2i') { // Needs special saving since it's not an input but a tab switch
             valueJSON.i2iMode = conf.i2i.controls.i2iMode.filter((elem) => {
-                return conf.shadowDOM.root.querySelector(elem.containerSel).style.display == 'none' ? false : true
+                return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
             })[0].name;
         } else if(type == 'iBrowser') {
 			return conf.extensions.iBrowser.functions.getValueJSON();
@@ -1737,7 +1733,7 @@
                     if(conf[type][prop].gradEl) {
                         valueJSON[prop] = getGradVal(conf[type][prop].gradEl);
                     } else if(conf[type][prop].el.classList.contains('input-accordion')) { // "input-accordion" (checkbox alternative)
-                        valueJSON[prop] = conf[type][prop].el.classList.contains('input-accordion-open') ? true : false;
+                        valueJSON[prop] = conf[type][prop].el.classList.contains('input-accordion-open');
                     } else if(conf[type][prop].el.type == 'fieldset') { // Radio buttons
                         valueJSON[prop] = conf[type][prop].el.querySelector('input:checked').value;
                     } else if(conf[type][prop].el.type == 'checkbox') {
@@ -1760,7 +1756,6 @@
         let inputJSONObject = JSON.parse(p_json);
         let type = inputJSONObject.type ? inputJSONObject.type : conf.commonData.activeType;
         let oldData = JSON.parse(getValueJSON(type));
-        let waitForThisContainer;
         awqLog('loadJson: ' + type);
 
         let currentModel = getGradVal(conf.commonData.sdModelCheckpoint.gradEl);
@@ -1795,7 +1790,7 @@
                         conf[type][prop].el.querySelector('[value="' + inputJSONObject[prop] + '"]').checked = true;
                         triggerChange(conf[type][prop].el.querySelector('[value="' + inputJSONObject[prop] + '"]'));
                     } else if(conf[type][prop].el.classList.contains('input-accordion')) { // "input-accordion" (checkbox alternative)
-                        let currentValue = conf[type][prop].el.classList.contains('input-accordion-open') ? true : false;
+                        let currentValue = conf[type][prop].el.classList.contains('input-accordion-open');
                         if(inputJSONObject[prop] != currentValue) {
                             conf[type][prop].el.querySelector('.label-wrap').click();
                         }
