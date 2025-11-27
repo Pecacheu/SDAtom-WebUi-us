@@ -1,269 +1,236 @@
-// ==UserScript==
-// @name         SDAtom-WebUi-us
-// @namespace    SDAtom-WebUi-us
-// @version      1.4.3
-// @description  Queue for AUTOMATIC1111 WebUi and an option to saving settings
-// @author       Kryptortio
-// @homepage     https://github.com/Kryptortio/SDAtom-WebUi-us
-// @match        http://127.0.0.1:7860/*
-// @updateURL    https://raw.githubusercontent.com/Kryptortio/SDAtom-WebUi-us/main/SDAtom-WebUi-us.user.js
-// @downloadURL  https://raw.githubusercontent.com/Kryptortio/SDAtom-WebUi-us/main/SDAtom-WebUi-us.user.js
-// @grant        none
-// ==/UserScript==
+//==UserScript==
+//@name         SDAtom-WebUi-us
+//@namespace    SDAtom-WebUi-us
+//@version      1.4.3
+//@description  Queue for AUTOMATIC1111 WebUi and an option to saving settings
+//@author       Kryptortio
+//@homepage     https://github.com/Kryptortio/SDAtom-WebUi-us
+//@match        http://127.0.0.1:7860/*
+//@updateURL    https://raw.githubusercontent.com/Kryptortio/SDAtom-WebUi-us/main/SDAtom-WebUi-us.user.js
+//@downloadURL  https://raw.githubusercontent.com/Kryptortio/SDAtom-WebUi-us/main/SDAtom-WebUi-us.user.js
+//@grant        none
+//==/UserScript==
 
 'use strict';
 (() => {
 
-const c_scriptVersion = typeof GM_info == 'undefined' ? '1.3.2' : GM_info.script.version;
-const c_scriptHandeler = typeof GM_info == 'undefined' ? '(not user script)' : GM_info.scriptHandler;
+const c_scriptVersion = typeof GM_info == 'undefined' ? '1.3.2' : GM_info.script.version,
+c_scriptHandeler = typeof GM_info == 'undefined' ? '(not user script)' : GM_info.scriptHandler;
 
-// ----------------------------------------------------------------------------- Config
+//----------------------------------------------------------------------------- Config
 let conf = {
-	shadowDOM:{sel:"gradio-app"},
+	shadowDOM: {sel: "gradio-app"},
 	commonData: {
-		t2iContainer:{sel:"#tab_txt2img"},
-		i2iContainer:{sel:"#tab_img2img"},
-		extContainer:{sel:"#tab_extras"},
-		sdModelCheckpoint:{grad:"setting_sd_model_checkpoint"},
-		versionContainer:{sel:"#footer .versions"},
-
-		working:false,
-		processing:false,
-		waiting:false,
+		t2iContainer: {sel: "#tab_txt2img"},
+		i2iContainer: {sel: "#tab_img2img"},
+		extContainer: {sel: "#tab_extras"},
+		sdModelCheckpoint: {grad: "setting_sd_model_checkpoint"},
+		versionContainer: {sel: "#footer .versions"},
+		working: false,
+		processing: false,
+		waiting: false,
 	},
 	t2i: {
-		controls:{
-			tabButton: {sel:"#tabs > div:nth-child(1) > button:nth-child(1)"},
-			genrateButton: {sel:"#txt2img_generate"},
-			skipButton: {sel:"#txt2img_skip"},
+		controls: {
+			tabButton: {sel: "#tabs > div:nth-child(1) > button:nth-child(1)"},
+			genrateButton: {sel: "#txt2img_generate"},
+			skipButton: {sel: "#txt2img_skip"},
 		},
-
-		prompt: {sel:"#txt2img_prompt textarea"},
-		negPrompt: {sel:"#txt2img_neg_prompt textarea"},
-
-		sample: {sel:"#txt2img_steps [id^=range_id]",sel2:"#txt2img_steps input"},
-		sampleMethod: {grad:"txt2img_sampling"},
-
-		width:  {sel:"#txt2img_width [id^=range_id]",sel2:"#txt2img_width input"},
-		height: {sel:"#txt2img_height [id^=range_id]",sel2:"#txt2img_height input"},
-
+		prompt: {sel: "#txt2img_prompt textarea"},
+		negPrompt: {sel: "#txt2img_neg_prompt textarea"},
+		sample: {sel: "#txt2img_steps [id^=range_id]", sel2: "#txt2img_steps input"},
+		sampleMethod: {grad: "txt2img_sampling"},
+		width: {sel: "#txt2img_width [id^=range_id]", sel2: "#txt2img_width input"},
+		height: {sel: "#txt2img_height [id^=range_id]", sel2: "#txt2img_height input"},
 		/*restoreFace: {sel:"#txt2img_settings #setting_face_restoration input"},
 		tiling: {sel:"#txt2img_settings #setting_tiling input"},*/
+		highresFix: {sel: "#txt2img_hr"},
+		hrFixUpscaler: {grad: "txt2img_hr_upscaler"},
+		hrFixSteps: {sel: "#txt2img_hires_steps [id^=range_id]", sel2: "#txt2img_hires_steps input"},
+		hrFixdenoise: {sel: "#txt2img_denoising_strength [id^=range_id]", sel2: "#txt2img_denoising_strength input"},
+		hrFixUpscaleBy: {sel: "#txt2img_hr_scale [id^=range_id]", sel2: "#txt2img_hr_scale input"},
+		hrFixWidth: {sel: "#txt2img_hr_resize_x [id^=range_id]", sel2: "#txt2img_hr_resize_x input"},
+		hrFixHeight: {sel: "#txt2img_hr_resize_y [id^=range_id]", sel2: "#txt2img_hr_resize_y input"},
+		batchCount: {sel: "#txt2img_batch_count [id^=range_id]", sel2: "#txt2img_batch_count input"},
+		batchSize: {sel: "#txt2img_batch_size [id^=range_id]", sel2: "#txt2img_batch_size input"},
+		cfg: {sel: "#txt2img_cfg_scale [id^=range_id]", se2: "#txt2img_cfg_scale input"},
+		seed: {sel: "#txt2img_seed input"},
+		extra: {sel: "#txt2img_subseed_show input"},
+		varSeed: {sel: "#txt2img_subseed input"},
+		varStr: {sel: "#txt2img_subseed_strength [id^=range_id]", sel2: "#txt2img_subseed_strength input"},
+		varRSFWidth: {sel: "#txt2img_seed_resize_from_w [id^=range_id]", sel2: "#txt2img_seed_resize_from_w input"},
+		varRSFHeight: {sel: "#txt2img_seed_resize_from_h [id^=range_id]", sel2: "#txt2img_seed_resize_from_h input"},
 
-		highresFix: {sel:"#txt2img_hr"},
-		hrFixUpscaler: {grad:"txt2img_hr_upscaler"},
-		hrFixSteps: {sel:"#txt2img_hires_steps [id^=range_id]",sel2:"#txt2img_hires_steps input"},
-		hrFixdenoise: {sel:"#txt2img_denoising_strength [id^=range_id]",sel2:"#txt2img_denoising_strength input"},
-		hrFixUpscaleBy: {sel:"#txt2img_hr_scale [id^=range_id]",sel2:"#txt2img_hr_scale input"},
-		hrFixWidth: {sel:"#txt2img_hr_resize_x [id^=range_id]",sel2:"#txt2img_hr_resize_x input"},
-		hrFixHeight: {sel:"#txt2img_hr_resize_y [id^=range_id]",sel2:"#txt2img_hr_resize_y input"},
+		script: {grad: "script_list", gradIndex: 0},
 
-		batchCount: {sel:"#txt2img_batch_count [id^=range_id]",sel2:"#txt2img_batch_count input"},
-		batchSize: {sel:"#txt2img_batch_size [id^=range_id]",sel2:"#txt2img_batch_size input"},
+		scriptPromptMatrixPutVar: {sel: "#script_txt2img_prompt_matrix_put_at_start input"},
+		scriptPromptMatrixUseDiff: {sel: "#script_txt2img_prompt_matrix_different_seeds input"},
 
-		cfg: {sel:"#txt2img_cfg_scale [id^=range_id]",se2:"#txt2img_cfg_scale input"},
-
-		seed: {sel:"#txt2img_seed input"},
-
-		extra: {sel:"#txt2img_subseed_show input"},
-		varSeed: {sel:"#txt2img_subseed input"},
-		varStr: {sel:"#txt2img_subseed_strength [id^=range_id]",sel2:"#txt2img_subseed_strength input"},
-		varRSFWidth: {sel:"#txt2img_seed_resize_from_w [id^=range_id]",sel2:"#txt2img_seed_resize_from_w input"},
-		varRSFHeight: {sel:"#txt2img_seed_resize_from_h [id^=range_id]",sel2:"#txt2img_seed_resize_from_h input"},
-
-		script: {grad:"script_list",gradIndex:0},
-
-		scriptPromptMatrixPutVar: {sel:"#script_txt2img_prompt_matrix_put_at_start input"},
-		scriptPromptMatrixUseDiff: {sel:"#script_txt2img_prompt_matrix_different_seeds input"},
-
-		scriptXYZXtype:{grad:"script_txt2img_xyz_plot_x_type"},
-		scriptXYZXVals:{sel:"#script_txt2img_xyz_plot_x_values textarea"},
-		scriptXYZYtype:{grad:"script_txt2img_xyz_plot_y_type"},
-		scriptXYZYVals:{sel:"#script_txt2img_xyz_plot_y_values textarea"},
-		scriptXYZZtype:{grad:"script_txt2img_xyz_plot_z_type"},
-		scriptXYZZVals:{sel:"#script_txt2img_xyz_plot_z_values textarea"},
-		scriptXYZDrawLeg:{sel:"#script_txt2img_xyz_plot_draw_legend input"},
-		scriptXYZIncludeSubImg:{sel:"#script_txt2img_xyz_plot_include_lone_images input"},
-		scriptXYZIncludeSubGrid:{sel:"#script_txt2img_xyz_plot_include_sub_grids input"},
-		scriptXYZKeepMOne:{sel:"#script_txt2img_xyz_plot_no_fixed_seeds input"},
-		scriptXYZGridMargin: {sel:"#script_txt2img_xyz_plot_margin_size [id^=range_id]",sel2:"#script_txt2img_xyz_plot_margin_size input"},
+		scriptXYZXtype: {grad: "script_txt2img_xyz_plot_x_type"},
+		scriptXYZXVals: {sel: "#script_txt2img_xyz_plot_x_values textarea"},
+		scriptXYZYtype: {grad: "script_txt2img_xyz_plot_y_type"},
+		scriptXYZYVals: {sel: "#script_txt2img_xyz_plot_y_values textarea"},
+		scriptXYZZtype: {grad: "script_txt2img_xyz_plot_z_type"},
+		scriptXYZZVals: {sel: "#script_txt2img_xyz_plot_z_values textarea"},
+		scriptXYZDrawLeg: {sel: "#script_txt2img_xyz_plot_draw_legend input"},
+		scriptXYZIncludeSubImg: {sel: "#script_txt2img_xyz_plot_include_lone_images input"},
+		scriptXYZIncludeSubGrid: {sel: "#script_txt2img_xyz_plot_include_sub_grids input"},
+		scriptXYZKeepMOne: {sel: "#script_txt2img_xyz_plot_no_fixed_seeds input"},
+		scriptXYZGridMargin: {sel: "#script_txt2img_xyz_plot_margin_size [id^=range_id]", sel2: "#script_txt2img_xyz_plot_margin_size input"},
 	},
-	i2i:{
-		controls:{
-			tabButton: {sel:"#tabs > div:nth-child(1) > button:nth-child(2)"},
-			genrateButton: {sel:"#img2img_generate"},
-			skipButton: {sel:"#img2img_skip"},
-			i2iMode:[
-				{name:"i2i", buttonSel:"#mode_img2img button:nth-child(1)", containerSel:"#img2img_img2img_tab"},
-				{name:"sketch", buttonSel:"#mode_img2img button:nth-child(2)", containerSel:"#img2img_img2img_sketch_tab"},
-				{name:"inpaint", buttonSel:"#mode_img2img button:nth-child(3)", containerSel:"#img2img_inpaint_tab"},
-				{name:"inpaintSketch", buttonSel:"#mode_img2img button:nth-child(4)", containerSel:"#img2img_inpaint_sketch_tab"},
-				{name:"inpaintUpload", buttonSel:"#mode_img2img button:nth-child(5)", containerSel:"#img2img_inpaint_upload_tab"},
-				{name:"batch", buttonSel:"#mode_img2img button:nth-child(6)", containerSel:"#img2img_batch_tab"},
+	i2i: {
+		controls: {
+			tabButton: {sel: "#tabs > div:nth-child(1) > button:nth-child(2)"},
+			genrateButton: {sel: "#img2img_generate"},
+			skipButton: {sel: "#img2img_skip"},
+			i2iMode: [
+				{name: "i2i", buttonSel: "#mode_img2img button:nth-child(1)", containerSel: "#img2img_img2img_tab"},
+				{name: "sketch", buttonSel: "#mode_img2img button:nth-child(2)", containerSel: "#img2img_img2img_sketch_tab"},
+				{name: "inpaint", buttonSel: "#mode_img2img button:nth-child(3)", containerSel: "#img2img_inpaint_tab"},
+				{name: "inpaintSketch", buttonSel: "#mode_img2img button:nth-child(4)", containerSel: "#img2img_inpaint_sketch_tab"},
+				{name: "inpaintUpload", buttonSel: "#mode_img2img button:nth-child(5)", containerSel: "#img2img_inpaint_upload_tab"},
+				{name: "batch", buttonSel: "#mode_img2img button:nth-child(6)", containerSel: "#img2img_batch_tab"},
 			],
 		},
-
-		prompt: {sel:"#img2img_prompt textarea"},
-		negPrompt: {sel:"#img2img_neg_prompt textarea"},
-
-		resizeMode: {sel:"#resize_mode"},
-
-		inpaintBlur: {sel:"#img2img_mask_blur [id^=range_id]",sel2:"#img2img_mask_blur"},
-		inpaintMaskMode: {sel:"#img2img_mask_mode"},
-		inpaintMaskContent: {sel:"#img2img_inpainting_fill"},
-		inpaintArea: {sel:"#img2img_inpaint_full_res"},
-		inpaintPadding: {sel:"#img2img_inpaint_full_res_padding [id^=range_id]",sel2:"#img2img_inpaint_full_res_padding"},
-
-
-		i2iBatchInputDir: {sel:"#img2img_batch_input_dir textarea"},
-		i2iBatchOutputDir: {sel:"#img2img_batch_output_dir textarea"},
-		i2iBatchMaskDir: {sel:"#img2img_batch_inpaint_mask_dir textarea"},
-
-		sample: {sel:"#img2img_steps [id^=range_id]",sel2:"#img2img_steps input"},
-		sampleMethod: {grad:"img2img_sampling"},
-
-		width:  {sel:"#img2img_width [id^=range_id]",sel2:"#img2img_width input"},
-		height: {sel:"#img2img_height [id^=range_id]",sel2:"#img2img_height input"},
-
+		prompt: {sel: "#img2img_prompt textarea"},
+		negPrompt: {sel: "#img2img_neg_prompt textarea"},
+		resizeMode: {sel: "#resize_mode"},
+		inpaintBlur: {sel: "#img2img_mask_blur [id^=range_id]", sel2: "#img2img_mask_blur"},
+		inpaintMaskMode: {sel: "#img2img_mask_mode"},
+		inpaintMaskContent: {sel: "#img2img_inpainting_fill"},
+		inpaintArea: {sel: "#img2img_inpaint_full_res"},
+		inpaintPadding: {sel: "#img2img_inpaint_full_res_padding [id^=range_id]", sel2: "#img2img_inpaint_full_res_padding"},
+		i2iBatchInputDir: {sel: "#img2img_batch_input_dir textarea"},
+		i2iBatchOutputDir: {sel: "#img2img_batch_output_dir textarea"},
+		i2iBatchMaskDir: {sel: "#img2img_batch_inpaint_mask_dir textarea"},
+		sample: {sel: "#img2img_steps [id^=range_id]", sel2: "#img2img_steps input"},
+		sampleMethod: {grad: "img2img_sampling"},
+		width: {sel: "#img2img_width [id^=range_id]", sel2: "#img2img_width input"},
+		height: {sel: "#img2img_height [id^=range_id]", sel2: "#img2img_height input"},
 		/*restoreFace: {sel:"#img2img_settings #setting_face_restoration input"},
 		tiling: {sel:"#img2img_settings #setting_tiling input"},*/
+		batchCount: {sel: "#img2img_batch_count [id^=range_id]", sel2: "#img2img_batch_count input"},
+		batchSize: {sel: "#img2img_batch_size [id^=range_id]", sel2: "#img2img_batch_size input"},
+		cfg: {sel: "#img2img_cfg_scale [id^=range_id]", se2: "#img2img_cfg_scale input"},
+		denoise: {sel: "#img2img_denoising_strength [id^=range_id]", se2: "#img2img_denoising_strength input"},
+		seed: {sel: "#img2img_seed input"},
+		extra: {sel: "#txt2img_subseed_show input"},
+		varSeed: {sel: "#img2img_subseed input"},
+		varStr: {sel: "#img2img_subseed_strength input", sel2: "#img2img_subseed_strength [id^=range_id]"},
+		varRSFWidth: {sel: "#img2img_seed_resize_from_w input", sel2: "#img2img_seed_resize_from_w [id^=range_id]"},
+		varRSFHeight: {sel: "#img2img_seed_resize_from_h input", sel2: "#img2img_seed_resize_from_h [id^=range_id]"},
 
-		batchCount: {sel:"#img2img_batch_count [id^=range_id]",sel2:"#img2img_batch_count input"},
-		batchSize: {sel:"#img2img_batch_size [id^=range_id]",sel2:"#img2img_batch_size input"},
+		script: {grad: "script_list", gradIndex: 1},
 
-		cfg: {sel:"#img2img_cfg_scale [id^=range_id]",se2:"#img2img_cfg_scale input"},
+		scriptPromptMatrixPutVar: {sel: "#script_img2img_prompt_matrix_put_at_start input"},
+		scriptPromptMatrixUseDiff: {sel: "#script_img2img_prompt_matrix_different_seeds input"},
 
-		denoise: {sel:"#img2img_denoising_strength [id^=range_id]",se2:"#img2img_denoising_strength input"},
+		scriptXYZXtype: {grad: "script_img2img_xyz_plot_x_type"},
+		scriptXYZXVals: {sel: "#script_img2img_xyz_plot_x_values textarea"},
+		scriptXYZYtype: {grad: "script_img2img_xyz_plot_y_type"},
+		scriptXYZYVals: {sel: "#script_img2img_xyz_plot_y_values textarea"},
+		scriptXYZZtype: {grad: "script_img2img_xyz_plot_z_type"},
+		scriptXYZZVals: {sel: "#script_img2img_xyz_plot_z_values textarea"},
+		scriptXYZDrawLeg: {sel: "#script_img2img_xyz_plot_draw_legend input"},
+		scriptXYZIncludeSubImg: {sel: "#script_img2img_xyz_plot_include_lone_images input"},
+		scriptXYZIncludeSubGrid: {sel: "#script_img2img_xyz_plot_include_sub_grids input"},
+		scriptXYZKeepMOne: {sel: "#script_img2img_xyz_plot_no_fixed_seeds input"},
+		scriptXYZGridMargin: {sel: "#script_img2img_xyz_plot_margin_size [id^=range_id]", sel2: "#script_img2img_xyz_plot_margin_size input"},
 
-		seed: {sel:"#img2img_seed input"},
+		scripti2iAltTestOverrideSampM: {sel: "#script_img2img_alternative_test_override_sampler input"},
+		scripti2iAltTestOverrideProm: {sel: "#script_img2img_alternative_test_override_prompt input"},
+		scripti2iAltTestOrigProm: {sel: "#script_img2img_alternative_test_original_prompt textarea"},
+		scripti2iAltTestOrigNProm: {sel: "#script_img2img_alternative_test_original_negative_prompt textarea"},
+		scripti2iAltTestOverrideSampS: {sel: "#script_img2img_alternative_test_override_steps input"},
+		scripti2iAltTestDecStep: {sel: "#script_img2img_alternative_test_st input", sel2: "#script_img2img_alternative_test_st [id^=range_id]"},
+		scripti2iAltTestOverrideDenoi: {sel: "#script_img2img_alternative_test_override_strength input"},
+		scripti2iAltTestDecCFG: {sel: "#script_img2img_alternative_test_cfg input", sel2: "#script_img2img_alternative_test_cfg [id^=range_id]"},
+		scripti2iAltTestRand: {sel: "#script_img2img_alternative_test_randomness input", sel2: "#script_img2img_alternative_test_randomness [id^=range_id]"},
+		scripti2iAltTestSigma: {sel: "#script_img2img_alternative_test_sigma_adjustment input"},
 
-		extra: {sel:"#txt2img_subseed_show input"},
-		varSeed: {sel:"#img2img_subseed input"},
-		varStr: {sel:"#img2img_subseed_strength input",sel2:"#img2img_subseed_strength [id^=range_id]"},
-		varRSFWidth: {sel:"#img2img_seed_resize_from_w input",sel2:"#img2img_seed_resize_from_w [id^=range_id]"},
-		varRSFHeight: {sel:"#img2img_seed_resize_from_h input",sel2:"#img2img_seed_resize_from_h [id^=range_id]"},
+		scriptLoopbackLoops: {sel: "#script_loopback_loops input", sel2: "#script_loopback_loops [id^=range_id]"},
+		scriptLoopbackDenoStr: {sel: "#script_loopback_final_denoising_strength input", sel2: "#script_loopback_final_denoising_strength [id^=range_id]"},
+		scriptLoopbackDenoStrCurve: {gradLab: "Denoising strength curve"},
+		scriptLoopbackAppend: {gradLab: "Append interrogated prompt at each iteration"},
 
-		script: {grad:"script_list",gradIndex:1},
+		scriptOutPMK2Pixels: {sel: "#script_outpainting_mk2_pixels input", sel2: "#script_outpainting_mk2_pixels [id^=range_id]"},
+		scriptOutPMK2MaskBlur: {sel: "#script_outpainting_mk2_mask_blur input", sel2: "#script_outpainting_mk2_mask_blur [id^=range_id]"},
+		scriptOutPMK2Left: {sel: "#script_outpainting_mk2_direction label:nth-child(1) input"},
+		scriptOutPMK2Right: {sel: "#script_outpainting_mk2_direction label:nth-child(2) input"},
+		scriptOutPMK2Up: {sel: "#script_outpainting_mk2_direction label:nth-child(3) input"},
+		scriptOutPMK2Down: {sel: "#script_outpainting_mk2_direction label:nth-child(4) input"},
+		scriptOutPMK2FallOff: {sel: "#script_outpainting_mk2_noise_q input", sel2: "#script_outpainting_mk2_noise_q [id^=range_id]"},
+		scriptOutPMK2ColorVar: {sel: "#script_outpainting_mk2_color_variation input", sel2: "#script_outpainting_mk2_color_variation [id^=range_id]"},
 
-		scriptPromptMatrixPutVar: {sel:"#script_img2img_prompt_matrix_put_at_start input"},
-		scriptPromptMatrixUseDiff: {sel:"#script_img2img_prompt_matrix_different_seeds input"},
+		scriptPoorManPixels: {sel: "#script_poor_mans_outpainting_pixels input", sel2: "#script_poor_mans_outpainting_pixels [id^=range_id]"},
+		scriptPoorManMaskBlur: {sel: "#script_poor_mans_outpainting_mask_blur input", sel2: "#script_poor_mans_outpainting_mask_blur [id^=range_id]"},
+		scriptPoorManMaskCont: {sel: "#script_poor_mans_outpainting_inpainting_fill"},
+		scriptPoorManLeft: {sel: "#script_poor_mans_outpainting_direction label:nth-child(1) input"},
+		scriptPoorManRight: {sel: "#script_poor_mans_outpainting_direction label:nth-child(2) input"},
+		scriptPoorManUp: {sel: "#script_poor_mans_outpainting_direction label:nth-child(3) input"},
+		scriptPoorManDown: {sel: "#script_poor_mans_outpainting_direction label:nth-child(4) input"},
 
-		scriptXYZXtype:{grad:"script_img2img_xyz_plot_x_type"},
-		scriptXYZXVals:{sel:"#script_img2img_xyz_plot_x_values textarea"},
-		scriptXYZYtype:{grad:"script_img2img_xyz_plot_y_type"},
-		scriptXYZYVals:{sel:"#script_img2img_xyz_plot_y_values textarea"},
-		scriptXYZZtype:{grad:"script_img2img_xyz_plot_z_type"},
-		scriptXYZZVals:{sel:"#script_img2img_xyz_plot_z_values textarea"},
-		scriptXYZDrawLeg:{sel:"#script_img2img_xyz_plot_draw_legend input"},
-		scriptXYZIncludeSubImg:{sel:"#script_img2img_xyz_plot_include_lone_images input"},
-		scriptXYZIncludeSubGrid:{sel:"#script_img2img_xyz_plot_include_sub_grids input"},
-		scriptXYZKeepMOne:{sel:"#script_img2img_xyz_plot_no_fixed_seeds input"},
-		scriptXYZGridMargin: {sel:"#script_img2img_xyz_plot_margin_size [id^=range_id]",sel2:"#script_img2img_xyz_plot_margin_size input"},
-
-		scripti2iAltTestOverrideSampM:{sel:"#script_img2img_alternative_test_override_sampler input"},
-		scripti2iAltTestOverrideProm:{sel:"#script_img2img_alternative_test_override_prompt input"},
-		scripti2iAltTestOrigProm:{sel:"#script_img2img_alternative_test_original_prompt textarea"},
-		scripti2iAltTestOrigNProm:{sel:"#script_img2img_alternative_test_original_negative_prompt textarea"},
-		scripti2iAltTestOverrideSampS:{sel:"#script_img2img_alternative_test_override_steps input"},
-		scripti2iAltTestDecStep:{sel:"#script_img2img_alternative_test_st input",sel2:"#script_img2img_alternative_test_st [id^=range_id]"},
-		scripti2iAltTestOverrideDenoi:{sel:"#script_img2img_alternative_test_override_strength input"},
-		scripti2iAltTestDecCFG:{sel:"#script_img2img_alternative_test_cfg input",sel2:"#script_img2img_alternative_test_cfg [id^=range_id]"},
-		scripti2iAltTestRand:{sel:"#script_img2img_alternative_test_randomness input",sel2:"#script_img2img_alternative_test_randomness [id^=range_id]"},
-		scripti2iAltTestSigma:{sel:"#script_img2img_alternative_test_sigma_adjustment input"},
-
-		scriptLoopbackLoops:{sel:"#script_loopback_loops input",sel2:"#script_loopback_loops [id^=range_id]"},
-		scriptLoopbackDenoStr:{sel:"#script_loopback_final_denoising_strength input",sel2:"#script_loopback_final_denoising_strength [id^=range_id]"},
-		scriptLoopbackDenoStrCurve:{gradLab:"Denoising strength curve"},
-		scriptLoopbackAppend:{gradLab:"Append interrogated prompt at each iteration"},
-
-		scriptOutPMK2Pixels:{sel:"#script_outpainting_mk2_pixels input",sel2:"#script_outpainting_mk2_pixels [id^=range_id]"},
-		scriptOutPMK2MaskBlur:{sel:"#script_outpainting_mk2_mask_blur input",sel2:"#script_outpainting_mk2_mask_blur [id^=range_id]"},
-		scriptOutPMK2Left:{sel:"#script_outpainting_mk2_direction label:nth-child(1) input"},
-		scriptOutPMK2Right:{sel:"#script_outpainting_mk2_direction label:nth-child(2) input"},
-		scriptOutPMK2Up:{sel:"#script_outpainting_mk2_direction label:nth-child(3) input"},
-		scriptOutPMK2Down:{sel:"#script_outpainting_mk2_direction label:nth-child(4) input"},
-		scriptOutPMK2FallOff:{sel:"#script_outpainting_mk2_noise_q input",sel2:"#script_outpainting_mk2_noise_q [id^=range_id]"},
-		scriptOutPMK2ColorVar:{sel:"#script_outpainting_mk2_color_variation input",sel2:"#script_outpainting_mk2_color_variation [id^=range_id]"},
-
-		scriptPoorManPixels:{sel:"#script_poor_mans_outpainting_pixels input",sel2:"#script_poor_mans_outpainting_pixels [id^=range_id]"},
-		scriptPoorManMaskBlur:{sel:"#script_poor_mans_outpainting_mask_blur input",sel2:"#script_poor_mans_outpainting_mask_blur [id^=range_id]"},
-		scriptPoorManMaskCont:{sel:"#script_poor_mans_outpainting_inpainting_fill"},
-		scriptPoorManLeft:{sel:"#script_poor_mans_outpainting_direction label:nth-child(1) input"},
-		scriptPoorManRight:{sel:"#script_poor_mans_outpainting_direction label:nth-child(2) input"},
-		scriptPoorManUp:{sel:"#script_poor_mans_outpainting_direction label:nth-child(3) input"},
-		scriptPoorManDown:{sel:"#script_poor_mans_outpainting_direction label:nth-child(4) input"},
-
-		scriptSDUpTile:{sel:"#script_sd_upscale_overlap input",sel2:"#script_sd_upscale_overlap [id^=range_id]"},
-		scriptSDUpScale:{sel:"#script_sd_upscale_scale_factor input",sel2:"#script_sd_upscale_scale_factor [id^=range_id]"},
-		scriptSDUpUpcaler:{sel:"#script_sd_upscale_upscaler_index"},
-
+		scriptSDUpTile: {sel: "#script_sd_upscale_overlap input", sel2: "#script_sd_upscale_overlap [id^=range_id]"},
+		scriptSDUpScale: {sel: "#script_sd_upscale_scale_factor input", sel2: "#script_sd_upscale_scale_factor [id^=range_id]"},
+		scriptSDUpUpcaler: {sel: "#script_sd_upscale_upscaler_index"},
 	},
-	ext:{
-		controls:{
-			tabButton: {sel:"#tabs > div:nth-child(1) > button:nth-child(3)"},
-			genrateButton: {sel:"#extras_generate"},
-			loadingElement:{sel:"#html_info_x_extras .wrap"},
-			extrasResizeMode:[
-				{name:"scaleBy",buttonSel:"#extras_resize_mode button:nth-child(1)",containerSel:"#extras_scale_by_tab"},
-				{name:"scaleTo",buttonSel:"#extras_resize_mode button:nth-child(2)",containerSel:"#extras_scale_to_tab"},
+	ext: {
+		controls: {
+			tabButton: {sel: "#tabs > div:nth-child(1) > button:nth-child(3)"},
+			genrateButton: {sel: "#extras_generate"},
+			loadingElement: {sel: "#html_info_x_extras .wrap"},
+			extrasResizeMode: [
+				{name: "scaleBy", buttonSel: "#extras_resize_mode button:nth-child(1)", containerSel: "#extras_scale_by_tab"},
+				{name: "scaleTo", buttonSel: "#extras_resize_mode button:nth-child(2)", containerSel: "#extras_scale_to_tab"},
 			],
-			extrasMode:[
-				{name:"singleImg",buttonSel:"#mode_extras button:nth-child(1)",containerSel:"#extras_single_tab"},
-				{name:"batchProcess",buttonSel:"#mode_extras button:nth-child(2)",containerSel:"#extras_batch_process_tab"},
-				{name:"batchDir",buttonSel:"#mode_extras button:nth-child(3)",containerSel:"#extras_batch_directory_tab"},
+			extrasMode: [
+				{name: "singleImg", buttonSel: "#mode_extras button:nth-child(1)", containerSel: "#extras_single_tab"},
+				{name: "batchProcess", buttonSel: "#mode_extras button:nth-child(2)", containerSel: "#extras_batch_process_tab"},
+				{name: "batchDir", buttonSel: "#mode_extras button:nth-child(3)", containerSel: "#extras_batch_directory_tab"},
 			],
 		},
-
-
-		scaleByResize:{sel:"#extras_upscaling_resize input",sel2:"#extras_upscaling_resize [id^=range_id]"},
-
-		scaleToWidth:{sel:"#extras_upscaling_resize_w input"},
-		scaleToHeight:{sel:"#extras_upscaling_resize_h input"},
-		scaleToCropToFit:{sel:"#extras_upscaling_crop input"},
-
-		batchDirInput:{sel:"#extras_batch_input_dir textarea"},
-		batchDirOutput:{sel:"#extras_batch_output_dir textarea"},
-		batchDirShowImg:{sel:"#extras_show_extras_results input"},
-
-		upscaler1:{grad:"extras_upscaler_1"},
-		upscaler2:{grad:"extras_upscaler_2"},
-		upscale2Vis:{sel:"#extras_upscaler_2_visibility input",sel2:"#extras_upscaler_2_visibility [id^=range_id]"},
-		GFPGANVis:{sel:"#extras_gfpgan_visibility input",sel2:"#extras_gfpgan_visibility [id^=range_id]"},
-		CodeFormVis:{sel:"#extras_codeformer_visibility input",sel2:"#extras_codeformer_visibility [id^=range_id]"},
-		CodeFormWeight:{sel:"#extras_codeformer_weight input",sel2:"#extras_codeformer_weight [id^=range_id]"},
-
-
+		scaleByResize: {sel: "#extras_upscaling_resize input", sel2: "#extras_upscaling_resize [id^=range_id]"},
+		scaleToWidth: {sel: "#extras_upscaling_resize_w input"},
+		scaleToHeight: {sel: "#extras_upscaling_resize_h input"},
+		scaleToCropToFit: {sel: "#extras_upscaling_crop input"},
+		batchDirInput: {sel: "#extras_batch_input_dir textarea"},
+		batchDirOutput: {sel: "#extras_batch_output_dir textarea"},
+		batchDirShowImg: {sel: "#extras_show_extras_results input"},
+		upscaler1: {grad: "extras_upscaler_1"},
+		upscaler2: {grad: "extras_upscaler_2"},
+		upscale2Vis: {sel: "#extras_upscaler_2_visibility input", sel2: "#extras_upscaler_2_visibility [id^=range_id]"},
+		GFPGANVis: {sel: "#extras_gfpgan_visibility input", sel2: "#extras_gfpgan_visibility [id^=range_id]"},
+		CodeFormVis: {sel: "#extras_codeformer_visibility input", sel2: "#extras_codeformer_visibility [id^=range_id]"},
+		CodeFormWeight: {sel: "#extras_codeformer_weight input", sel2: "#extras_codeformer_weight [id^=range_id]"},
 	},
 	extensions: {
 		iBrowser: {
-			name:"stable-diffusion-webui-images-browser",
-			existCheck:{sel:"#tab_image_browser"},
+			name: "stable-diffusion-webui-images-browser",
+			existCheck: {sel: "#tab_image_browser"},
 			guiElems: {
-				iBrowserContainer:{sel:"#tab_image_browser"},
+				iBrowserContainer: {sel: "#tab_image_browser"},
 				generationInfo: {sel: "#image_browser_tab_txt2img_image_browser_file_info textarea"},
-
-				txt2img:{sel:'#image_browser_tab_txt2img_image_browser_file_info textarea'},
-				img2img:{sel:'#image_browser_tab_img2img_image_browser_file_info textarea'},
-				txt2imgG:{sel:'#image_browser_tab_txt2img-grids_image_browser_file_info textarea'},
-				img2imgG:{sel:'#image_browser_tab_img2img-grids_image_browser_file_info textarea'},
-				extras:{sel:'#image_browser_tab_extras_image_browser_file_info textarea'},
-				favorites:{sel:'#image_browser_tab_favorites_image_browser_file_info textarea'},
+				txt2img: {sel: '#image_browser_tab_txt2img_image_browser_file_info textarea'},
+				img2img: {sel: '#image_browser_tab_img2img_image_browser_file_info textarea'},
+				txt2imgG: {sel: '#image_browser_tab_txt2img-grids_image_browser_file_info textarea'},
+				img2imgG: {sel: '#image_browser_tab_img2img-grids_image_browser_file_info textarea'},
+				extras: {sel: '#image_browser_tab_extras_image_browser_file_info textarea'},
+				favorites: {sel: '#image_browser_tab_favorites_image_browser_file_info textarea'},
 			},
-			ui:{},
-			text:{
-				queueVariationsButtonText:'Add 5 variations',
-				queueHiResVersionButtonText:'Add HiRes version',
+			ui: {},
+			text: {
+				queueVariationsButtonText: 'Add 5 variations',
+				queueHiResVersionButtonText: 'Add HiRes version',
 			},
 			functions: {
 				getValueJSON: () => {
 					awqLog('iBrowser.getValueJSON: parsing data');
-					let valueJSON = {type:'t2i'};
+					let valueJSON = {type: 't2i'};
 
 					let currentTab = document.querySelector('#image_browser_tabs_container button.selected').innerHTML;
-					currentTab = currentTab.replace(/\s/g,'');
-					currentTab = currentTab.replace('-grids','G').toLowerCase();
-
-					let generationInfoValue = conf.extensions.iBrowser.guiElems[currentTab].el.value;
+					currentTab = currentTab.replace(/\s/g, '');
+					currentTab = currentTab.replace('-grids', 'G').toLowerCase(),
+					generationInfoValue = conf.extensions.iBrowser.guiElems[currentTab].el.value;
 
 					//Used when loading prompt from image browser
 					/*
@@ -278,138 +245,131 @@ let conf = {
 					<prompt>, <negative prompt>, <template> and <negative template> can all be multiline, or missing.
 					Maybe assume that <prompt> is never missing?
 					*/
-					let lines = generationInfoValue.split(/\r?\n/);
-					let whichLine=0; //0=prompt, 1=negPrompt, 2=template, 3=negTemplate, 4: dictionary
-					valueJSON['prompt']='';
-					valueJSON['negPrompt']='';
+					let lines = generationInfoValue.split(/\r?\n/),
+					whichLine = 0; //0=prompt, 1=negPrompt, 2=template, 3=negTemplate, 4: dictionary
+					valueJSON['prompt'] = '', valueJSON['negPrompt'] = '';
 
-					for (let l of lines) {
-						if (l.startsWith("Negative prompt: ")) {
-							whichLine=1;
-							l=l.substring(17);
+					for(let l of lines) {
+						if(l.startsWith("Negative prompt: ")) {
+							whichLine = 1;
+							l = l.substring(17);
 						}
-						else if (l.startsWith("Template: ")) {
-							whichLine=2;
-							l=l.substring(10);
+						else if(l.startsWith("Template: ")) {
+							whichLine = 2;
+							l = l.substring(10);
 						}
-						else if (l.startsWith("Negative Template: ")) {
-							whichLine=3;
-							l=l.substring(19);
+						else if(l.startsWith("Negative Template: ")) {
+							whichLine = 3;
+							l = l.substring(19);
 						}
-						else if (l.startsWith("Steps: ")) {
-							whichLine=4;
+						else if(l.startsWith("Steps: ")) {
+							whichLine = 4;
 						}
 
-						switch (whichLine) {
-							case 0:
-								valueJSON['prompt']+=l;
-								break;
-							case 1:
-								valueJSON['negPrompt']+=l;
-								break;
-							case 2:
-								//ignore template
-								break;
-							case 3:
-								//ignore neg template
-								break;
-							case 4:
-								for (let v of l.split(/, /)) {
-									let kv=v.split(/: /);
-									let key=kv[0];
-									switch (kv[0]){
-									case "Steps":
-										valueJSON['sample']=kv[1];
-										break;
-									case "Sampler":
-										valueJSON['sampleMethod']=kv[1];
-										break;
-									case "CFG scale":
-										valueJSON['cfg']=kv[1];
-										break;
-									case "Seed":
-										valueJSON['seed']=kv[1];
-										break;
-									case "Size":
-										let wh=kv[1].split(/x/)
-										valueJSON['width']=wh[0];
-										valueJSON['height']=wh[1];
-										break;
-									case "Model":
-										valueJSON['sdModelCheckpoint']=kv[1];
-										break;
-									case "Denoising strength":
-										valueJSON['hrFixdenoise']=kv[1];
-										break;
-									case "Hires upscale":
-										valueJSON['hrFixUpscaleBy']=kv[1];
-										valueJSON['highresFix']=true;
-										break;
-									case "Hires upscaler":
-										valueJSON['hrFixUpscaler']=kv[1];
-										break;
-									}
+						switch(whichLine) {
+						case 0:
+							valueJSON['prompt'] += l;
+							break;
+						case 1:
+							valueJSON['negPrompt'] += l;
+							break;
+						case 2:
+							break; //ignore template
+						case 3:
+							break; //ignore neg template
+						case 4:
+							for(let v of l.split(/, /)) {
+								let kv = v.split(/: /);
+								switch(kv[0]) {
+								case "Steps":
+									valueJSON['sample'] = kv[1];
+									break;
+								case "Sampler":
+									valueJSON['sampleMethod'] = kv[1];
+									break;
+								case "CFG scale":
+									valueJSON['cfg'] = kv[1];
+									break;
+								case "Seed":
+									valueJSON['seed'] = kv[1];
+									break;
+								case "Size":
+									let wh = kv[1].split(/x/)
+									valueJSON['width'] = wh[0];
+									valueJSON['height'] = wh[1];
+									break;
+								case "Model":
+									valueJSON['sdModelCheckpoint'] = kv[1];
+									break;
+								case "Denoising strength":
+									valueJSON['hrFixdenoise'] = kv[1];
+									break;
+								case "Hires upscale":
+									valueJSON['hrFixUpscaleBy'] = kv[1];
+									valueJSON['highresFix'] = true;
+									break;
+								case "Hires upscaler":
+									valueJSON['hrFixUpscaler'] = kv[1];
 								}
-								break;
-						} // End of switch
-					} // End of for
+							}
+						}
+					}
 					return JSON.stringify(valueJSON);
 				},
-			}, // End of functions
-		}, // End of iBrowser
+			},
+		},
 	},
-
-	ui:{},
+	ui: {},
 	scriptSettings: {
-		defaultQuantity:{name:"Default queue quantity", description:"Default number of times to execute each queue item", type:"numeric", value:1},
-		rememberQueue:{name:"Remember queue", description:"Remember the queue if you reload the page", type:"boolean", value:true},
-		stayReady:{name:"Stay ready", description:"Remain ready after end-of-queue until manually stopped", type:"boolean", value:false},
-		notificationSound:{name:"Notification sound", description:"Sound to be played when processing of queue items stops", type:"boolean", value:true},
-		extensionScript:{name:"Extension script(s)", description:"https://github.com/Kryptortio/SDAtom-WebUi-us#script-extensions", type:"text", value:""},
-		promptFilter:{name:"Prompt filter(s)", description:"https://github.com/Kryptortio/SDAtom-WebUi-us#prompt-filter", type:"text", value:""},
-		promptFilterNegative:{name:"Filter negative prompt", description:"Apply the prompt filter to the negative filter as well", type:"boolean", value:false},
-		autoscrollOutput:{name:"Autoscroll console", description:"Scroll console automatically when new lines appear", type:"boolean", value:true},
-		verboseLog:{name:"Verbose console", description:"Log as much as possible to the console", type:"boolean", value:false},
-		maxOutputLines:{name:"Max console lines", description:"The maximum number of lines that can be shown in the console box", type:"numeric", value:500},
-		overwriteQueueSettings1:{name:"Alt 1 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 1 button to add to queue (same format as in the queue)", type:"text", value:'{"width":"768","height":"768"}'},
-		overwriteQueueSettings2:{name:"Alt 2 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 2 button to add to queue (same format as in the queue)", type:"text", value:'{"width":"1024","height":"1024"}'},
-		overwriteQueueSettings3:{name:"Alt 3 overwrite", description:"Add settings you want to overwrite the current settings with when you click the Alt 3 button to add to queue (same format as in the queue)", type:"text", value:'{"sample":"20","sampleMethod":"Euler a","width":"512","height":"512","restoreFace": false,"tiling": false,"batchCount": "1","batchSize": "1","cfg": "7","seed": "-1","extra": false,  "varSeed": "-1","varStr": "0"}'},
-		buttonOpacity:{name:"Button transparency", description:"Change how visible the floating buttons in the corner should be", type:"numeric", value:0.7},
+		defaultQuantity: {name: "Default queue quantity", description: "Default number of times to execute each queue item", type: "numeric", value: 1},
+		rememberQueue: {name: "Remember queue", description: "Remember the queue if you reload the page", type: "boolean", value: true},
+		stayReady: {name: "Stay ready", description: "Remain ready after end-of-queue until manually stopped", type: "boolean", value: false},
+		notificationSound: {name: "Notification sound", description: "Sound to be played when processing of queue items stops", type: "boolean", value: true},
+		extensionScript: {name: "Extension script(s)", description: "https://github.com/Kryptortio/SDAtom-WebUi-us#script-extensions", type: "text", value: ""},
+		promptFilter: {name: "Prompt filter(s)", description: "https://github.com/Kryptortio/SDAtom-WebUi-us#prompt-filter", type: "text", value: ""},
+		promptFilterNegative: {name: "Filter negative prompt", description: "Apply the prompt filter to the negative filter as well", type: "boolean", value: false},
+		autoscrollOutput: {name: "Autoscroll console", description: "Scroll console automatically when new lines appear", type: "boolean", value: true},
+		verboseLog: {name: "Verbose console", description: "Log as much as possible to the console", type: "boolean", value: false},
+		maxOutputLines: {name: "Max console lines", description: "The maximum number of lines that can be shown in the console box", type: "numeric", value: 500},
+		overwriteQueueSettings1: {name: "Alt 1 overwrite", description: "Add settings you want to overwrite the current settings with when you click the Alt 1 button to add to queue (same format as in the queue)", type: "text", value: '{"width":768, "height":768}'},
+		overwriteQueueSettings2: {name: "Alt 2 overwrite", description: "Add settings you want to overwrite the current settings with when you click the Alt 2 button to add to queue (same format as in the queue)", type: "text", value: '{"width":1024, "height":1024}'},
+		overwriteQueueSettings3: {name: "Alt 3 overwrite", description: "Add settings you want to overwrite the current settings with when you click the Alt 3 button to add to queue (same format as in the queue)", type: "text", value: '{"sample":20, "sampleMethod":"Euler a", "width":512, "height":512, "restoreFace":false, "tiling":false, "batchCount":1, "batchSize":1, "cfg":7, "seed":-1, "extra":false, "varSeed":-1, "varStr":0}'},
+		buttonOpacity: {name: "Button transparency", description: "Change how visible the floating buttons in the corner should be", type: "numeric", value: 0.7},
 	},
 	savedSetting: JSON.parse(localStorage.awqSavedSetting || '{}'),
 	currentQueue: JSON.parse(localStorage.awqCurrentQueue || '[]'),
-};
+}
 
-if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnProperty("awqScriptSettings")) { // Tmp settings migration
+if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnProperty("awqScriptSettings")) { //Tmp settings migration
 	awqLog('Copying settings from old storage');
-	if (localStorage.hasOwnProperty("awqNotificationSound"))
+	if(localStorage.hasOwnProperty("awqNotificationSound"))
 		conf.scriptSettings.notificationSound.value = localStorage.awqNotificationSound == 1;
-	if (localStorage.hasOwnProperty("awqAutoscrollOutput"))
+	if(localStorage.hasOwnProperty("awqAutoscrollOutput"))
 		conf.scriptSettings.autoscrollOutput.value = localStorage.awqAutoscrollOutput == 1;
-	if (localStorage.hasOwnProperty("awqVerboseLog"))
+	if(localStorage.hasOwnProperty("awqVerboseLog"))
 		conf.scriptSettings.verboseLog.value = localStorage.awqVerboseLog == 1;
-	if (localStorage.hasOwnProperty("awqMaxOutputLines"))
+	if(localStorage.hasOwnProperty("awqMaxOutputLines"))
 		conf.scriptSettings.maxOutputLines.value = localStorage.awqMaxOutputLines;
-	if (localStorage.hasOwnProperty("awqPromptFilter"))
+	if(localStorage.hasOwnProperty("awqPromptFilter"))
 		conf.scriptSettings.promptFilter.value = localStorage.awqPromptFilter;
-	if (localStorage.hasOwnProperty("awqExtensionScript"))
+	if(localStorage.hasOwnProperty("awqExtensionScript"))
 		conf.scriptSettings.extensionScript.value = localStorage.awqExtensionScript;
 }
-const c_emptyQueueString = 'Queue is empty';
-const c_addToQueueButtonText = 'Add to queue';
-const c_processButtonText = 'Process queue';
-const c_defaultTextStoredSettings = "Stored settings";
-const c_innerUIWidth = 'calc(100vw - 20px)';
-const c_uiElemntHeight = '25px';
-const c_uiElemntHeightSmall = '18px';
-const c_audio_base64 = new Audio('data:audio/mpeg;base64,//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVR9DU02wxI2HBY0xzzTPHVjsaEggIYbBQymbZ5et+lSLLDAPL2LcegkDNlkiLYgIBgMoIRxodnFVNMu2pmYwSfDSC2CxTFDKowcoycCimGKGFhYRCx50EjDS05dCEXJaIRTRHMTQfkO/U/sjuSEa5wroVM0a2hmXr0oA7JasD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V///+YGDIYDB4HGBRAYjCABAQMAOrVXeNb/////QYBwSBIETHQhBgBRAMGgq1lV3jW13f//////ogl+UTWeJbqBIMiQBa6X2STL/Y1tdq75lrtXf///////44AURAYAVhE+lMmFrcRNYQqJhyhq4FhWjY1tdx/mWu475lrv//////////rTVMnql4XBZApWX+aWuRL1jSmZf5pbEEvXQWDS+Z+yzHfK2u1d8y12rtFKTRUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAOAAAAAAA0gBwAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+const c_emptyQueueString = 'Queue is empty',
+c_addToQueueButtonText = 'Add to queue',
+c_processButtonText = 'Process queue',
+c_defaultTextStoredSettings = "Stored settings",
+c_innerUIWidth = 'calc(100vw - 20px)',
+c_uiElemntHeight = '25px',
+c_uiElemntHeightSmall = '18px',
+c_audio_base64 = new Audio('data:audio/mpeg;base64,//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVR9DU02wxI2HBY0xzzTPHVjsaEggIYbBQymbZ5et+lSLLDAPL2LcegkDNlkiLYgIBgMoIRxodnFVNMu2pmYwSfDSC2CxTFDKowcoycCimGKGFhYRCx50EjDS05dCEXJaIRTRHMTQfkO/U/sjuSEa5wroVM0a2hmXr0oA7JasD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V///+YGDIYDB4HGBRAYjCABAQMAOrVXeNb/////QYBwSBIETHQhBgBRAMGgq1lV3jW13f//////ogl+UTWeJbqBIMiQBa6X2STL/Y1tdq75lrtXf///////44AURAYAVhE+lMmFrcRNYQqJhyhq4FhWjY1tdx/mWu475lrv//////////rTVMnql4XBZApWX+aWuRL1jSmZf5pbEEvXQWDS+Z+yzHfK2u1d8y12rtFKTRUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAOAAAAAAA0gBwAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
 
-const c_defaultOtputConsoleText = "Here you will see some information about what the script is doing";
-const c_defaultOtputConsoleTextHTML = `<span class="console-description" style="color:darkgray">${c_defaultOtputConsoleText}</span>`;
-const c_wait_tick_duration = 200;
-const c_any_value = '<ANY VALUE>';
+const c_defaultOtputConsoleText = "Here you will see some information about what the script is doing",
+c_defaultOtputConsoleTextHTML = `<span class="console-description" style="color:darkgray">${c_defaultOtputConsoleText}</span>`,
+c_wait_tick_duration = 200,
+c_any_value = '<ANY VALUE>';
 
-// ----------------------------------------------------------------------------- Logging
+//----------------------------------------------------------------------------- Logging
 function preAwqLog(p_message) {console.log(`SDAtom-WebUi-us: ${p_message}`)}
 preAwqLog(`Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${navigator.userAgent}`);
 
@@ -418,6 +378,7 @@ function awqLog(p_message) {
 		awqLogPublishMsg(p_message, 'lightgray');
 	}
 }
+
 function awqLogPublishMsg(p_message, p_color) {
 	if(!conf.ui.outputConsole) return;
 	if(conf.ui.outputConsole.innerHTML.match('console-description')) {
@@ -427,43 +388,34 @@ function awqLogPublishMsg(p_message, p_color) {
 	let lines = conf.ui.outputConsole.querySelectorAll('div');
 	let line = document.createElement('div');
 	line.className = 'awq-console-line';
-	const timestamp = (new Date()).toLocaleTimeString([], {hour: '2-digit',minute: '2-digit',second: '2-digit', hour12: false});
-	line.innerHTML = '<span style="' + (p_color ? 'color:'+p_color : '') + '">' + timestamp + ': ' + p_message + '</span>';
+	const timestamp = (new Date()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+	line.innerHTML = '<span style="' + (p_color ? 'color:' + p_color : '') + '">' + timestamp + ': ' + p_message + '</span>';
 	conf.ui.outputConsole.appendChild(line);
 
-	if(lines.length >= conf.scriptSettings.maxOutputLines.value) {
-		lines[0].parentNode.removeChild(lines[0]);
-	}
+	if(conf.ui.outputConsole.childElementCount >= conf.scriptSettings.maxOutputLines.value) conf.ui.outputConsole.firstChild.remove();
 	if(conf.scriptSettings.autoscrollOutput.value) conf.ui.outputConsole.scrollTo(0, conf.ui.outputConsole.scrollHeight);
 }
-function awqLogPublishError(p_message) { awqLogPublishMsg(p_message, 'red') }
+
+function awqLogPublishError(p_message) {awqLogPublishMsg(p_message, 'red')}
 addEventListener("error", (event) => {
-	if(conf.scriptSettings.verboseLog.value) {
-		awqLogPublishMsg(
-			`Javascript error (can be caused by something other than this script): ${event.message} source:${event.filename} line:${event.lineno} col:${event.colno} Error:${event.error ? JSON.stringify(event.error) : '' }`,
-			'darkorange'
-		);
-	}
-},true);
+	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg(`Javascript error (can be caused by something other than this script): ${event.message} source:${event.filename} line:${event.lineno} col:${event.colno} Error:${event.error ? JSON.stringify(event.error) : ''}`, 'darkorange');
+}, true);
 addEventListener("unhandledrejection", (event) => {
-	if(conf.scriptSettings.verboseLog.value) {
-		awqLogPublishMsg(
-			`Javascript promise error (can be caused by something other than this script): ${event.reason}`,
-			'darkorange'
-		);
-	}
-},true);
+	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg(`Javascript promise error (can be caused by something other than this script): ${event.reason}`, 'darkorange');
+}, true);
+
 let oldWarn = console.warn, oldInfo = console.info, oldLog = console.log, oldError = console.error;
 console.warn = p_msg => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (warn) message (can be caused by something other than this script):' + p_msg +`<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldWarn(p_msg);
+	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (warn) message (can be caused by something other than this script):' + p_msg + `<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldWarn(p_msg);
 }
 console.info = p_msg => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (info) message (can be caused by something other than this script):' + p_msg +`<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldInfo(p_msg);
+	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (info) message (can be caused by something other than this script):' + p_msg + `<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldInfo(p_msg);
 }
 console.log = p_msg => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (log) message (can be caused by something other than this script):' + p_msg +`<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldLog(p_msg);
+	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (log) message (can be caused by something other than this script):' + p_msg + `<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldLog(p_msg);
 }
-// ----------------------------------------------------------------------------- Wait for content to load
+
+//----------------------------------------------------------------------------- Wait for content to load
 let waitForLoadInterval = setInterval(initAWQ, c_wait_tick_duration);
 function initAWQ() {
 	conf.shadowDOM.root = document.querySelector(conf.shadowDOM.sel);
@@ -472,7 +424,7 @@ function initAWQ() {
 
 	conf.commonData.versionContainer.el = conf.shadowDOM.root.querySelector('#footer .versions');
 
-	// Check for extensions
+	//Check for extensions
 	for(let ext in conf.extensions) {
 		if(!document.querySelector(conf.extensions[ext].existCheck.sel)) {
 			preAwqLog(`Extension ${conf.extensions[ext].name} not found, disabling`);
@@ -485,12 +437,12 @@ function initAWQ() {
 	loadScriptSettings();
 	generateMainUI();
 
-	try { throw new Error(); } catch(e) { awqLog(`initAWQ: stack = ${e.stack.replace(/^(.*?)\binitAWQ/s,'')}`) }
+	try {throw new Error()} catch(e) {awqLog(`initAWQ: stack = ${e.stack.replace(/^(.*?)\binitAWQ/s, '')}`)}
 
-	try { eval(conf.scriptSettings.extensionScript.value);} catch(e) { awqLogPublishMsg(`Failed to load extension script, error: <pre>${e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`,'darkorange')}
+	try {eval(conf.scriptSettings.extensionScript.value)} catch(e) {awqLogPublishMsg(`Failed to load extension script, error: <pre>${e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
 
 	function mapElementsToConf(p_object, p_info) {
-		for (let prop in p_object) {
+		for(let prop in p_object) {
 			if(p_object[prop].sel) {
 				p_object[prop].el = conf.shadowDOM.root.querySelector(p_object[prop].sel);
 				if(!p_object[prop].el) awqLogPublishError(`Failed to find the ${p_info} ${prop}`);
@@ -586,9 +538,9 @@ function generateMainUI() {
 	conf.ui.container = container;
 
 	let addToQueueButton = appendAddToQueueButton(container, 0, c_addToQueueButtonText, appendQueueItem, "Add an item to the queue according to current tab and settings");
-	let addToQueueButtonA1 = appendAddToQueueButton(container, 25, 'A1', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value)) }, "Add an item to the queue according to current tab and settings and overwrite with Alt 1",63);
-	let addToQueueButtonA2 = appendAddToQueueButton(container, 25, 'A2', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings2.value)) }, "Add an item to the queue according to current tab and settings and overwrite with Alt 2",32);
-	let addToQueueButtonA3 = appendAddToQueueButton(container, 25, 'A3', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value)) }, "Add an item to the queue according to current tab and settings and overwrite with Alt 3",1);
+	let addToQueueButtonA1 = appendAddToQueueButton(container, 25, 'A1', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value))}, "Add an item to the queue according to current tab and settings and overwrite with Alt 1", 63);
+	let addToQueueButtonA2 = appendAddToQueueButton(container, 25, 'A2', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings2.value))}, "Add an item to the queue according to current tab and settings and overwrite with Alt 2", 32);
+	let addToQueueButtonA3 = appendAddToQueueButton(container, 25, 'A3', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value))}, "Add an item to the queue according to current tab and settings and overwrite with Alt 3", 1);
 
 	let defaultQueueQuantity = document.createElement('input');
 	defaultQueueQuantity.placeholder = 'Def #';
@@ -597,11 +549,12 @@ function generateMainUI() {
 	defaultQueueQuantity.type = 'number';
 	defaultQueueQuantity.title = "How many items of each will be added to the queue (default is 1)";
 	defaultQueueQuantity.value = conf.scriptSettings.defaultQuantity.value;
-	defaultQueueQuantity.onchange = function() {conf.scriptSettings.defaultQuantity.value = this.value};
-	defaultQueueQuantity.onfocus = function() {this.select()};
 	container.appendChild(defaultQueueQuantity);
+	defaultQueueQuantity.onchange = function() {conf.scriptSettings.defaultQuantity.value = this.value}
+	defaultQueueQuantity.onfocus = function() {this.select()}
+
 	let assignDefaultToAll = document.createElement('button');
-	assignDefaultToAll.innerHTML = ' ⤵';
+	assignDefaultToAll.innerHTML = '⤵';
 	assignDefaultToAll.style.cursor = "pointer";
 	assignDefaultToAll.title = "Assign the default value to all queue items";
 	assignDefaultToAll.style.height = c_uiElemntHeight;
@@ -611,8 +564,8 @@ function generateMainUI() {
 			document.querySelectorAll('.AWQ-item-quantity').forEach((inp) => {inp.value = conf.scriptSettings.defaultQuantity.value});
 			updateQueueState();
 		}
-	};
 	container.appendChild(assignDefaultToAll);
+	}
 
 	let processButton = document.createElement('button');
 	processButton.innerHTML = c_processButtonText;
@@ -648,7 +601,6 @@ function generateMainUI() {
 	scriptSettingsButton.onclick = openScriptSettingsPopup;
 	container.appendChild(scriptSettingsButton);
 
-
 	let queueContainer = document.createElement('div');
 	queueContainer.style.width = c_innerUIWidth;
 	queueContainer.style.border = "1px solid white";
@@ -656,8 +608,6 @@ function generateMainUI() {
 	queueContainer.style.marginBottom = "5px";
 	queueContainer.innerHTML = c_emptyQueueString;
 	container.appendChild(queueContainer);
-
-
 
 	let clearSettingButton = document.createElement('button');
 	clearSettingButton.innerHTML = "❌";
@@ -667,10 +617,12 @@ function generateMainUI() {
 	clearSettingButton.style.cursor = "pointer";
 	clearSettingButton.title = "Remove the currently selected setting";
 	container.appendChild(clearSettingButton);
+
 	let settingsStorage = document.createElement('select');
 	settingsStorage.style.height = c_uiElemntHeight;
 	settingsStorage.title = "List of stored settings (template of all settings)";
 	container.appendChild(settingsStorage);
+
 	let editSettingButton = document.createElement('button');
 	editSettingButton.innerHTML = "✏️";
 	editSettingButton.style.height = c_uiElemntHeight;
@@ -678,6 +630,7 @@ function generateMainUI() {
 	editSettingButton.style.cursor = "pointer";
 	editSettingButton.title = "Edit the currently selected setting (a property can be removed to not change it when loading)";
 	container.appendChild(editSettingButton);
+
 	let loadSettingButton = document.createElement('button');
 	loadSettingButton.innerHTML = "Load";
 	loadSettingButton.style.height = c_uiElemntHeight;
@@ -685,12 +638,14 @@ function generateMainUI() {
 	loadSettingButton.style.cursor = "pointer";
 	loadSettingButton.title = "Load the currently selected setting (replacing current settings)";
 	container.appendChild(loadSettingButton);
+
 	let settingName = document.createElement('input');
 	settingName.placeholder = "Setting name";
 	settingName.style.height = c_uiElemntHeightSmall;
 	settingName.title = "Name to use when saving a new setting (duplicates not allowed)";
-	settingName.onfocus = function() {this.select()};
 	container.appendChild(settingName);
+	settingName.onfocus = function() {this.select()}
+
 	let saveSettingButton = document.createElement('button');
 	saveSettingButton.innerHTML = "Save";
 	saveSettingButton.style.height = c_uiElemntHeight;
@@ -698,8 +653,6 @@ function generateMainUI() {
 	saveSettingButton.style.cursor = "pointer";
 	saveSettingButton.title = "Save currently selected settings so that you can load them again later";
 	container.appendChild(saveSettingButton);
-
-
 
 	let outputConsole = document.createElement('div');
 	outputConsole.title = c_defaultOtputConsoleText;
@@ -712,27 +665,24 @@ function generateMainUI() {
 	outputConsole.style.marginBottom = "5px";
 	outputConsole.style.marginLeft = "15px";
 	outputConsole.style.marginRight = "15px";
-	outputConsole.style.height = (16*10)+"px";
+	outputConsole.style.height = (16 * 10) + "px";
 	outputConsole.style.overflow = "auto";
-	//outputConsole.style.backgroundColor = "white";
 	outputConsole.style.boxShadow = 'inset 0px 1px 4px #666';
 	container.appendChild(outputConsole);
 
 	let outputConsoleClearButton = document.createElement('button');
 	outputConsoleClearButton.innerHTML = "Clear";
 	outputConsoleClearButton.style.height = c_uiElemntHeight;
-	outputConsoleClearButton.onclick = () => {conf.ui.outputConsole.innerHTML = c_defaultOtputConsoleTextHTML};
+	outputConsoleClearButton.onclick = () => {conf.ui.outputConsole.innerHTML = c_defaultOtputConsoleTextHTML}
 	outputConsoleClearButton.style.cursor = "pointer";
 	outputConsoleClearButton.style.marginLeft = "10px";
 	outputConsoleClearButton.title = "Clear the console above";
 	container.appendChild(outputConsoleClearButton);
 
-
 	conf.ui.addToQueueButton = addToQueueButton;
 	conf.ui.addToQueueButtonA1 = addToQueueButtonA1;
 	conf.ui.addToQueueButtonA2 = addToQueueButtonA2;
 	conf.ui.addToQueueButtonA3 = addToQueueButtonA3;
-
 	conf.ui.queueContainer = queueContainer;
 	conf.ui.clearButton = clearButton;
 	conf.ui.loadSettingButton = loadSettingButton;
@@ -742,14 +692,12 @@ function generateMainUI() {
 	conf.ui.outputConsole = outputConsole;
 
 	document.querySelector('.gradio-container').style.overflow = 'visible'; // Fix so that a dropdown menu can overlap the queue
-
 	refreshSettings();
 
 	if(conf.currentQueue.length > 0) {
-		awqLog('Loaded saved queue:'+conf.currentQueue.length);
-		for(let i = 0; i < conf.currentQueue.length; i++) {
+		awqLog('Loaded saved queue:' + conf.currentQueue.length);
+		for(let i = 0; i < conf.currentQueue.length; ++i)
 			appendQueueItem(conf.currentQueue[i].quantity, conf.currentQueue[i].value, conf.currentQueue[i].type);
-		}
 		updateQueueState();
 	}
 	awqLog('generateMainUI: Completed');
@@ -772,9 +720,9 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 	itemType.disabled = true;
 	let itemQuantity = document.createElement('input');
 	function updateItemQuantityBG() {
-		if(itemQuantity.value.length == 0) { itemQuantity.style.color = 'red'; }
-		else if(itemQuantity.value < 1) { itemQuantity.style.color = 'rgb(0, 225, 0)'; itemQuantity.classList.add('completed-queue-item') }
-		else if(itemQuantity.value > 0) { itemQuantity.style.color = 'white'; itemQuantity.classList.remove('completed-queue-item')}
+		if(itemQuantity.value.length == 0) {itemQuantity.style.color = 'red'}
+		else if(itemQuantity.value < 1) {itemQuantity.style.color = 'rgb(0, 225, 0)'; itemQuantity.classList.add('completed-queue-item')}
+		else if(itemQuantity.value > 0) {itemQuantity.style.color = 'white'; itemQuantity.classList.remove('completed-queue-item')}
 	}
 	itemQuantity.classList = 'AWQ-item-quantity';
 	itemQuantity.value = quantity;
@@ -784,9 +732,9 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 	itemQuantity.onchange = () => {
 		updateItemQuantityBG();
 		updateQueueState();
-	};
+	}
 	updateItemQuantityBG();
-	itemQuantity.onfocus = function() {this.select()};
+	itemQuantity.onfocus = function() {this.select()}
 	itemQuantity.title = "This is how many times this item should be executed";
 	let itemJSON = document.createElement('input');
 	itemJSON.classList = 'AWQ-item-JSON';
@@ -824,7 +772,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 		this.parentNode.parentNode.removeChild(this.parentNode);
 		updateQueueState();
 		awqLogPublishMsg(`Removed queue item`);
-	};
+	}
 	let moveItemUp = document.createElement('button');
 	moveItemUp.innerHTML = '⇧';
 	moveItemUp.style.height = c_uiElemntHeight;
@@ -838,7 +786,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 			updateQueueState();
 		}
 
-	};
+	}
 	let moveItemDown = document.createElement('button');
 	moveItemDown.innerHTML = '⇩';
 	moveItemDown.style.height = c_uiElemntHeight;
@@ -851,7 +799,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 			awqLogPublishMsg(`Rearranged queue`);
 			updateQueueState();
 		}
-	};
+	}
 	let moveItemBottom = document.createElement('button');
 	moveItemBottom.innerHTML = '⤓';
 	moveItemBottom.style.height = c_uiElemntHeight;
@@ -863,7 +811,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 			tar.parentNode.appendChild(tar);
 			updateQueueState();
 		}
-	};
+	}
 	let moveItemTop = document.createElement('button');
 	moveItemTop.innerHTML = '⤒';
 	moveItemTop.style.height = c_uiElemntHeight;
@@ -877,7 +825,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 			awqLogPublishMsg(`Rearranged queue`);
 			updateQueueState();
 		}
-	};
+	}
 	let loadItem = document.createElement('button');
 	loadItem.innerHTML = 'Load';
 	loadItem.style.height = c_uiElemntHeight;
@@ -886,7 +834,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 	loadItem.onclick = async function() {
 		let itemRow = this.parentNode;
 		await loadJson(itemRow.querySelector('.AWQ-item-JSON').value);
-	};
+	}
 
 	queueItem.appendChild(removeItem);
 	queueItem.appendChild(moveItemUp);
@@ -902,7 +850,7 @@ function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
 	conf.ui.queueContainer.appendChild(queueItem);
 
 	awqLogPublishMsg(`Added new ${itemType.value} queue item (${quantity}x)`);
-	// Wait with updating state while loading a predefined queue
+	//Wait with updating state while loading a predefined queue
 	if(isNaN(p_quantity)) updateQueueState();
 }
 
@@ -910,7 +858,7 @@ function saveScriptSettings() {
 	awqLog('Saving script settings');
 	let scriptSettingsCopy = structuredClone(conf.scriptSettings);
 
-	// Delete data that does not need to be saved
+	//Delete data that does not need to be saved
 	for(let ssk in scriptSettingsCopy) {
 		for(let ssk2 in scriptSettingsCopy[ssk]) {
 			if(ssk2 != 'value') delete scriptSettingsCopy[ssk][ssk2];
@@ -927,7 +875,7 @@ function loadScriptSettings(p_scriptSettings) {
 
 	let savedSettings = p_scriptSettings || JSON.parse(localStorage.awqScriptSettings);
 	for(let ssk in conf.scriptSettings) {
-		if(savedSettings.hasOwnProperty(ssk)) conf.scriptSettings[ssk].value =  savedSettings[ssk].value;
+		if(savedSettings.hasOwnProperty(ssk)) conf.scriptSettings[ssk].value = savedSettings[ssk].value;
 	}
 }
 
@@ -939,9 +887,9 @@ function openScriptSettingsPopup() {
 	dialog.style.minHeight = '90%';
 	dialog.style.marginLeft = '5%';
 	dialog.style.marginTop = '5%';
-	dialog.style.top = '0';
+	dialog.style.top = 0;
 	dialog.style.position = 'fixed';
-	dialog.style.zIndex = '1000';
+	dialog.style.zIndex = 1000;
 	dialog.style.borderRadius = '15px';
 	dialog.style.boxShadow = '3px 3px 100px black,3px 3px 500px black, 3px 3px 25px black, inset 0 0 10px black';
 
@@ -957,7 +905,7 @@ function openScriptSettingsPopup() {
 	closeButton.style.right = '10px';
 	closeButton.style.textShadow = '#292929 2px 3px 5px';
 	closeButton.style.cursor = 'pointer';
-	closeButton.onclick = () => {document.body.removeChild(dialog); saveScriptSettings()};
+	closeButton.onclick = () => {document.body.removeChild(dialog); saveScriptSettings()}
 	closeButton.innerHTML = '⛌';
 
 	let dialogBody = document.createElement('span');
@@ -965,7 +913,7 @@ function openScriptSettingsPopup() {
 	dialogBody.style.height = '90%';
 	dialogBody.style.marginLeft = '5%';
 	dialogBody.style.marginTop = 'max(5%,45px)';
-	dialogBody.style.top = '0';
+	dialogBody.style.top = 0;
 	dialogBody.style.position = 'absolute';
 	dialogBody.style.overflow = 'auto';
 	dialogBody.style.display = 'grid';
@@ -976,12 +924,12 @@ function openScriptSettingsPopup() {
 	dialog.appendChild(closeButton);
 	dialog.appendChild(dialogBody);
 
-	// Create input for each script setting
+	//Create input for each script setting
 	for(let ssKey in conf.scriptSettings) {
 		let ssObj = conf.scriptSettings[ssKey];
 
 		let ssElem = document.createElement(ssObj.type == 'text' ? 'textarea' : 'input');
-		ssElem.id = 'awq-ss-'+ssKey;
+		ssElem.id = 'awq-ss-' + ssKey;
 		ssElem.placeholder = ssObj.name;
 		ssElem.value = ssObj.value;
 		ssElem.style.height = ssObj.type == 'text' ? '40px' : '20px';
@@ -996,9 +944,8 @@ function openScriptSettingsPopup() {
 			ssElem.style.verticalAlign = 'middle';
 			ssElem.checked = ssObj.value;
 		} else if(ssObj.type == 'numeric') {
-			ssElem.type = 'number' ;
-			ssElem.inputmode = 'numeric';
-			ssElem.onkeypress = e => { if (e.key.match(/\D/g)) { e.preventDefault();} };
+			ssElem.type = 'number', ssElem.inputmode = 'numeric';
+			ssElem.onkeypress = e => {if(e.key.match(/\D/g)) e.preventDefault()}
 		}
 
 		let cbLabel = document.createElement('label');
@@ -1025,8 +972,6 @@ function openScriptSettingsPopup() {
 		dialogBody.appendChild(ssElemContainer);
 	}
 
-
-
 	let importExportButton = document.createElement('button');
 	importExportButton.innerHTML = "Import/export";
 	importExportButton.style.height = c_uiElemntHeight;
@@ -1039,20 +984,17 @@ function openScriptSettingsPopup() {
 	importExportData.style.height = c_uiElemntHeightSmall;
 	importExportData.style.width = '125px';
 	importExportData.title = "Exported data will be show here, add data here to import it. Importing data will reload the page!";
-	importExportData.onfocus = function() {this.select()};
+	importExportData.onfocus = function() {this.select()}
 	let importExportContainer = document.createElement('span');
 	importExportContainer.appendChild(importExportButton);
 	importExportContainer.appendChild(importExportData);
 	dialogBody.appendChild(importExportContainer);
 
-
-
-	//                                  *** Search & Replace ***              START
-	// Add replace in queue function GUI
+	//Add replace in queue function GUI
 	let collectedAttributes = {};
 	let anyOption = document.createElement('option');
 	anyOption.value = c_any_value;
-	conf.currentQueue.map(el => { // Fetch all attributes and values currently in queue
+	conf.currentQueue.map(el => { //Fetch all attributes and values currently in queue
 		let queueObject = JSON.parse(el.value);
 		Object.keys(queueObject).forEach(key => {
 			if(!collectedAttributes[key]) collectedAttributes[key] = {};
@@ -1074,16 +1016,16 @@ function openScriptSettingsPopup() {
 	replaceAttributeSelectorLabel.innerHTML = 'Attribute';
 	replaceAttributeSelectorLabel.title = 'Choose the attribute to replace inside of (<ANY_VALUE> to replace in any attribute)';
 	let replaceAttributeSelector = document.createElement('input');
-	replaceAttributeSelector.setAttribute('list','awq-replace-attrib-dataset');
+	replaceAttributeSelector.setAttribute('list', 'awq-replace-attrib-dataset');
 	replaceAttributeSelector.className = 'awq-right-align-placeholder';
-	replaceAttributeSelector.placeholder='▼';
+	replaceAttributeSelector.placeholder = '▼';
 	replaceAttributeSelector.type = 'text';
 	replaceAttributeSelector.title = replaceAttributeSelectorLabel.title;
-	replaceAttributeSelector.onfocus = function() {this.select()};
+	replaceAttributeSelector.onfocus = function() {this.select()}
 	let replaceAttributeSelectorDataset = document.createElement('datalist');
 	replaceAttributeSelectorDataset.id = 'awq-replace-attrib-dataset';
 	replaceAttributeSelectorDataset.appendChild(anyOption);
-	Object.keys(collectedAttributes).forEach(key => { // Add all attributes from queue
+	Object.keys(collectedAttributes).forEach(key => { //Add all attributes from queue
 		let attribOption = document.createElement('option');
 		attribOption.value = key;
 		replaceAttributeSelectorDataset.appendChild(attribOption);
@@ -1094,12 +1036,12 @@ function openScriptSettingsPopup() {
 	replaceValueSelectorLabel.style.display = 'block';
 	replaceValueSelectorLabel.title = 'Find this value and replace it with the one below (<ANY_VALUE> to replace anything)';
 	let replaceValueSelector = document.createElement('input');
-	replaceValueSelector.setAttribute('list','awq-replace-value-dataset');
+	replaceValueSelector.setAttribute('list', 'awq-replace-value-dataset');
 	replaceValueSelector.className = 'awq-right-align-placeholder';
-	replaceValueSelector.placeholder='▼';
+	replaceValueSelector.placeholder = '▼';
 	replaceValueSelector.type = 'text';
 	replaceValueSelector.title = replaceValueSelectorLabel.title;
-	replaceValueSelector.onfocus = function() {this.select()};
+	replaceValueSelector.onfocus = function() {this.select()}
 	let replaceValueSelectorDataset = document.createElement('datalist');
 	replaceValueSelectorDataset.id = 'awq-replace-value-dataset';
 	let replaceContainer = document.createElement('span');
@@ -1107,12 +1049,12 @@ function openScriptSettingsPopup() {
 	replaceNewValueSelectorLabel.innerHTML = 'New value';
 	replaceNewValueSelectorLabel.style.display = 'block';
 	let replaceNewValueSelector = document.createElement('input');
-	replaceNewValueSelector.setAttribute('list','awq-replace-new-value-dataset');
+	replaceNewValueSelector.setAttribute('list', 'awq-replace-new-value-dataset');
 	replaceNewValueSelector.className = 'awq-right-align-placeholder';
-	replaceNewValueSelector.placeholder='▼';
+	replaceNewValueSelector.placeholder = '▼';
 	replaceNewValueSelector.type = 'text';
 	replaceNewValueSelector.title = 'The value to replace with';
-	replaceNewValueSelector.onfocus = function() {this.select()};
+	replaceNewValueSelector.onfocus = function() {this.select()}
 	let replaceNewValueSelectorDataset = document.createElement('datalist');
 	replaceNewValueSelectorDataset.id = 'awq-replace-new-value-dataset';
 
@@ -1139,7 +1081,7 @@ function openScriptSettingsPopup() {
 		if(foundValues) {
 			replaceValueSelectorDataset.innerHTML = '';
 			replaceValueSelectorDataset.appendChild(anyOption.cloneNode());
-			Object.keys(foundValues).forEach(key => { // Add all possible values for currently selected attribute
+			Object.keys(foundValues).forEach(key => { //Add all possible values for currently selected attribute
 				let valueOption = document.createElement('option');
 				valueOption.value = key;
 				replaceValueSelectorDataset.appendChild(valueOption);
@@ -1157,15 +1099,15 @@ function openScriptSettingsPopup() {
 	}
 	function updateReplaceNewValueSelectorDataset() {
 		let matchingValues = [];
-		// Any components that has the option we are trying to replace?
-		componentOptions.forEach(arr => { if(arr.includes(replaceValueSelector.value)) matchingValues.push(arr) });
+		//Any components that has the option we are trying to replace?
+		componentOptions.forEach(arr => {if(arr.includes(replaceValueSelector.value)) matchingValues.push(arr)});
 
-		// If not add all their options
+		//If not add all their options
 		if(matchingValues.length == 0) {
 			matchingValues = [...componentOptions];
 		}
 
-		// Remove duplicates and replace dataset options
+		//Remove duplicates and replace dataset options
 		replaceNewValueSelectorDataset.innerHTML = '';
 		[...new Set(matchingValues.flat())].forEach(el => {
 			let valueOption = document.createElement('option');
@@ -1179,7 +1121,7 @@ function openScriptSettingsPopup() {
 	replaceValueSelector.onchange = updateReplaceValueSelectorDataset;
 	updateReplaceValueSelectorDataset();
 
-	// Handle clicking the search and replace button
+	//Handle clicking the search and replace button
 	replaceButton.onclick = () => {
 		let attributeValue = replaceAttributeSelector.value
 		let anyAttribute = attributeValue == c_any_value;
@@ -1188,29 +1130,29 @@ function openScriptSettingsPopup() {
 		let currentQueue = conf.currentQueue;
 		let newValue = replaceNewValueSelector.value;
 
-		Object.keys(currentQueue).forEach(key => { // Loop queue entries
+		Object.keys(currentQueue).forEach(key => { //Loop queue entries
 			let queueElentry = JSON.parse(currentQueue[key].value);
 			if(anyAttribute) {
-				Object.keys(queueElentry).forEach(keyInner => { // Loop queue entry attributes
+				Object.keys(queueElentry).forEach(keyInner => { //Loop queue entry attributes
 					if(anyOldValue) {
-						// Replace everything with the new value (why are you doing this?)
+						//Replace everything with the new value (why are you doing this?)
 						if(newValue != queueElentry[keyInner]) awqLog(`replaceButton: updated queue item ${key} attribute ${keyInner} to ${newValue}`);
 						queueElentry[keyInner] = newValue;
 					} else {
-						// Search and replace in all attributes
-						let replacedValue = queueElentry[keyInner].replaceAll ? queueElentry[keyInner].replaceAll(oldValue,newValue) : queueElentry[keyInner];
+						//Search and replace in all attributes
+						let replacedValue = queueElentry[keyInner].replaceAll ? queueElentry[keyInner].replaceAll(oldValue, newValue) : queueElentry[keyInner];
 						if(replacedValue != queueElentry[keyInner]) awqLog(`replaceButton: updated queue item ${key} attribute ${keyInner} to ${replacedValue}`);
 						queueElentry[keyInner] = replacedValue;
 					}
 				});
 			} else {
 				if(anyOldValue) {
-					// Replace all values for this attribute
+					//Replace all values for this attribute
 					if(newValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
 					queueElentry[attributeValue] = newValue;
 				} else {
-					// Replace string in specific attribute
-					let replacedValue = queueElentry[attributeValue].replaceAll(oldValue,newValue);
+					//Replace string in specific attribute
+					let replacedValue = queueElentry[attributeValue].replaceAll(oldValue, newValue);
 					if(replacedValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
 					queueElentry[attributeValue] = replacedValue;
 				}
@@ -1218,15 +1160,15 @@ function openScriptSettingsPopup() {
 			currentQueue[key].value = JSON.stringify(queueElentry);
 		});
 
-		// Update state
 		let queueElems = conf.ui.queueContainer.querySelectorAll('.AWQ-item-JSON');
-		for(let i=0; i < currentQueue.length; ++i) queueElems[i].value = currentQueue[i].value;
+		//Update state
+		for(let i = 0; i < currentQueue.length; ++i) queueElems[i].value = currentQueue[i].value;
 		updateQueueState();
 	}
 
 	document.body.appendChild(dialog);
 
-	// Customize behaviour of the opacity button to show immediate effect
+	//Customize behaviour of the opacity button to show immediate effect
 	let opacityButton = document.getElementById('awq-ss-buttonOpacity');
 	opacityButton.type = 'range';
 	opacityButton.min = 0;
@@ -1237,7 +1179,7 @@ function openScriptSettingsPopup() {
 			conf.scriptSettings.buttonOpacity.value = opacityButton.value;
 			elem.style.opacity = conf.scriptSettings.buttonOpacity.value;
 		});
-	};
+	}
 }
 
 function toggleProcessButton(p_set_processing) {
@@ -1268,10 +1210,10 @@ function toggleProcessButton(p_set_processing) {
 
 function updateQueueState() {
 	let queueItems = conf.ui.queueContainer.getElementsByTagName('div');
-	awqLog('updateQueueState: old length:'+conf.currentQueue.length + ' new length:'+queueItems.length);
+	awqLog('updateQueueState: old length:' + conf.currentQueue.length + ' new length:' + queueItems.length);
 
 	let newArray = [];
-	for(let i = 0; i < queueItems.length; i++) {
+	for(let i = 0; i < queueItems.length; ++i) {
 		let newRowObject = {};
 		newRowObject.rowid = i;
 		newRowObject.type = queueItems[i].querySelector('.AWQ-item-type').value;
@@ -1281,7 +1223,7 @@ function updateQueueState() {
 	}
 	conf.currentQueue = newArray;
 	if(conf.scriptSettings.rememberQueue.value) {
-		awqLog('updateQueueState: Saving current queue state '+conf.currentQueue.length);
+		awqLog('updateQueueState: Saving current queue state ' + conf.currentQueue.length);
 		localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
 	} else {
 		awqLog('updateQueueState: Cleared current queue state');
@@ -1291,7 +1233,7 @@ function updateQueueState() {
 
 let stuckProcessingCounter = 0;
 function updateStatus() {
-	// Get old & new activeType
+	//Get old & new activeType
 	let previousType = conf.commonData.activeType,
 	newType = conf.commonData.activeType =
 		conf.commonData.i2iContainer.el.style.display !== 'none' ? 'i2i' :
@@ -1311,7 +1253,7 @@ function updateStatus() {
 	if(conf.commonData.waiting || conf.commonData.working || !conf.commonData.processing)
 		stuckProcessingCounter = 0;
 	else if(!conf.scriptSettings.stayReady.value && ++stuckProcessingCounter > 30) {
-		// If no work is being done for a while disable queue
+		//If no work is being done for a while disable queue
 		awqLog('updateStatus: stuck in processing queue status? Disabling queue processing');
 		toggleProcessButton(false);
 		stuckProcessingCounter = 0;
@@ -1322,15 +1264,15 @@ function updateStatus() {
 async function executeAllNewTasks() {
 	while(conf.commonData.processing) {
 		//awqLog('executeNewTask: working='+conf.commonData.working);
-		if(conf.commonData.working) return; // Already working on task
+		if(conf.commonData.working) return; //Already working on task
 
 		if(conf.commonData.previousTaskStartTime) {
 			let timeSpent = Date.now() - conf.commonData.previousTaskStartTime;
-			awqLogPublishMsg(`Completed work on queue item after ${Math.floor(timeSpent/1000/60)} minutes ${Math.round((timeSpent-Math.floor(timeSpent/60000)*60000)/1000)} seconds`);
+			awqLogPublishMsg(`Completed work on queue item after ${Math.floor(timeSpent / 1000 / 60)} minutes ${Math.round((timeSpent - Math.floor(timeSpent / 60000) * 60000) / 1000)} seconds`);
 		}
 
 		let queueItems = conf.ui.queueContainer.getElementsByTagName('div');
-		for(let i = 0; i < queueItems.length; i++) {
+		for(let i = 0; i < queueItems.length; ++i) {
 			let itemQuantity = queueItems[i].querySelector('.AWQ-item-quantity');
 			let itemType = queueItems[i].querySelector('.AWQ-item-type').value;
 			if(itemQuantity.value > 0) {
@@ -1340,7 +1282,7 @@ async function executeAllNewTasks() {
 				await clickStartButton(itemType);
 				itemQuantity.value = itemQuantity.value - 1;
 				itemQuantity.onchange();
-				awqLogPublishMsg(`Started working on ${itemType} queue item ${i+1} (${itemQuantity.value} more to go) `);
+				awqLogPublishMsg(`Started working on ${itemType} queue item ${i + 1} (${itemQuantity.value} more to go) `);
 				conf.commonData.previousTaskStartTime = Date.now();
 				await waitForTaskToComplete(itemType);
 				queueItems = true;
@@ -1348,7 +1290,7 @@ async function executeAllNewTasks() {
 			}
 		}
 
-		// No more tasks to process
+		//No more tasks to process
 		if(queueItems !== true) {
 			if(conf.commonData.previousTaskStartTime) {
 				conf.commonData.previousTaskStartTime = null;
@@ -1361,7 +1303,7 @@ async function executeAllNewTasks() {
 	}
 }
 
-function playWorkCompleteSound() { if(conf.scriptSettings.notificationSound.value) c_audio_base64.play(); }
+function playWorkCompleteSound() {if(conf.scriptSettings.notificationSound.value) c_audio_base64.play()}
 
 function editSetting() {
 	let settingStorage = conf.ui.settingsStorage;
@@ -1369,7 +1311,7 @@ function editSetting() {
 	let settingOption = settingStorage.options[settingIndex];
 	let settingKey = settingOption.innerHTML;
 	if(settingKey == c_defaultTextStoredSettings) return;
-	awqLog('editSettings: index'+settingIndex);
+	awqLog('editSettings: index' + settingIndex);
 
 	let editContainer = document.createElement('div');
 	editContainer.style.cssText = 'position: fixed;bottom: 0;left: 0;width: 100vw;height: 100vh;background:black;z-index: 9999;';
@@ -1402,7 +1344,7 @@ function editSetting() {
 	document.body.appendChild(editContainer);
 
 	editButton.onclick = () => {
-		// Validate
+		//Validate
 		if(txtInput.value.length < 1) {
 			alert('Name is missing');
 			return;
@@ -1411,33 +1353,33 @@ function editSetting() {
 			alert('Value is invalid JSON');
 			return;
 		}
-		if(!['t2i-','i2i-','ext-'].includes(txtInput.value.substr(0,4))) {
+		if(!['t2i-', 'i2i-', 'ext-'].includes(txtInput.value.substr(0, 4))) {
 			alert('Name does not have valid prefix (t2i-, i2i-, ext-)');
 			return;
 		}
 
-		// Remove overlay
+		//Remove overlay
 		document.body.style.overflow = 'scroll';
 		document.body.removeChild(editContainer);
 
-		// Update data and refresh UI
-		awqLog('editSettings: updating '+ settingKey + (settingKey == txtInput.value ? '' : ' to ' + txtInput.value));
+		//Update data and refresh UI
+		awqLog('editSettings: updating ' + settingKey + (settingKey == txtInput.value ? '' : ' to ' + txtInput.value));
 		delete conf.savedSetting[settingKey];
 		conf.savedSetting[txtInput.value] = txtArea.value;
 		localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
 		refreshSettings();
 
-		// Select option again
-		let optionToSelect = Array.from(settingStorage.options).find(item => item.text ===txtInput.value);
+		//Select option again
+		let optionToSelect = Array.from(settingStorage.options).find(item => item.text === txtInput.value);
 		optionToSelect.selected = true;
-	};
+	}
 }
 
 function saveSettings() {
-	if(conf.ui.settingName.value.length < 1) {alert('Missing name'); return;}
-	if(conf.savedSetting.hasOwnProperty(conf.ui.settingName.value)) {alert('Duplicate name'); return;}
+	if(conf.ui.settingName.value.length < 1) return alert('Missing name');
+	if(conf.savedSetting.hasOwnProperty(conf.ui.settingName.value)) return alert('Duplicate name');
 
-	let settingSetName = conf.commonData.activeType + '-'+ conf.ui.settingName.value;
+	let settingSetName = conf.commonData.activeType + '-' + conf.ui.settingName.value;
 	conf.savedSetting[settingSetName] = getValueJSON();
 
 	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
@@ -1446,11 +1388,11 @@ function saveSettings() {
 	refreshSettings();
 }
 function refreshSettings() {
-	awqLog('refreshSettings: saved settings:'+Object.keys(conf.savedSetting).length);
+	awqLog('refreshSettings: saved settings:' + Object.keys(conf.savedSetting).length);
 	conf.ui.settingName.value = "";
 	conf.ui.settingsStorage.innerHTML = "";
 
-	for (let prop in conf.savedSetting) {
+	for(let prop in conf.savedSetting) {
 		let newOption = document.createElement('option');
 		newOption.innerHTML = prop;
 		newOption.value = conf.savedSetting[prop]
@@ -1494,17 +1436,17 @@ function clickStartButton(p_type) {
 	return new Promise(resolve => {
 		let retryCount = 0;
 		let waitForSwitchInterval = setInterval(() => {
-			retryCount++;
+			++retryCount;
 			if(retryCount >= c_max_time_to_wait) {
 				targetButton.click(); retryCount = 0;
-				awqLog(`Work has not started after ${c_max_time_to_wait/10} seconds, clicked again`);
+				awqLog(`Work has not started after ${c_max_time_to_wait / 10} seconds, clicked again`);
 			}
 			if(!webUICurrentyWorkingOn(p_type)) return;
 			conf.commonData.waiting = false;
 			awqLog('clickStartButton: work has started');
 			clearInterval(waitForSwitchInterval);
 			resolve();
-		},c_wait_tick_duration);
+		}, c_wait_tick_duration);
 	});
 }
 
@@ -1512,7 +1454,7 @@ function switchTabAndWait(p_type) {
 	if(p_type == conf.commonData.activeType) return;
 	awqLog('switchTabAndWait: ' + p_type);
 
-	conf.shadowDOM.root.querySelector(conf[p_type].controls.tabButton.sel).click(); // Using .el doesn't work
+	conf.shadowDOM.root.querySelector(conf[p_type].controls.tabButton.sel).click(); //Using .el doesn't work
 
 	conf.commonData.waiting = true;
 	return new Promise(resolve => {
@@ -1523,14 +1465,14 @@ function switchTabAndWait(p_type) {
 			awqLogPublishMsg(`Switched active tab from ${startingTab} to ${conf.commonData.activeType}`);
 			clearInterval(waitForSwitchInterval);
 			resolve();
-		},c_wait_tick_duration);
+		}, c_wait_tick_duration);
 	});
 }
 
 function switchTabAndWaitUntilSwitched(p_targetTabName, p_tabConfig) {
 	awqLog('switchTabAndWaitUntilSwitched: p_target=' + p_targetTabName + ' p_config=' + p_tabConfig);
 
-	let targetTabConf = p_tabConfig.filter( (elem) => { return elem.name == p_targetTabName })[0];
+	let targetTabConf = p_tabConfig.filter((elem) => {return elem.name == p_targetTabName})[0];
 	function correctTabVisible() {
 		return conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display != 'none';
 	}
@@ -1547,7 +1489,7 @@ function switchTabAndWaitUntilSwitched(p_targetTabName, p_tabConfig) {
 			awqLog('switchTabAndWaitUntilSwitched: switch complete');
 			clearInterval(waitForSwitchInterval);
 			resolve();
-		},c_wait_tick_duration);
+		}, c_wait_tick_duration);
 	});
 }
 
@@ -1560,7 +1502,7 @@ function forceGradioUIUpdate() {
 function webUICurrentyWorkingOn(p_itemType) {
 	if(p_itemType == 'i2i') {
 		return conf.i2i.controls.skipButton.el.getAttribute('style') == 'display: block;';
-	} else if (p_itemType == 't2i') {
+	} else if(p_itemType == 't2i') {
 		return conf.t2i.controls.skipButton.el.getAttribute('style') == 'display: block;';
 	} else {
 		return conf.ext.controls.loadingElement.el.innerHTML.length > 0;
@@ -1577,7 +1519,7 @@ function waitForTaskToComplete(p_itemType) {
 			awqLog(`Work is complete for ${p_itemType}`);
 			conf.commonData.waiting = conf.commonData.working = false;
 			resolve();
-		},c_wait_tick_duration);
+		}, c_wait_tick_duration);
 	});
 }
 
@@ -1586,7 +1528,7 @@ function filterPrompt(p_prompt_text, p_neg) {
 	let promptFilter = conf.scriptSettings.promptFilter.value.length > 0 ?
 		JSON.parse(conf.scriptSettings.promptFilter.value) : [];
 
-	for(let i=0; i < promptFilter.length; i++) {
+	for(let i = 0; i < promptFilter.length; ++i) {
 		if(!promptFilter[i].hasOwnProperty('pattern') ||
 			!promptFilter[i].hasOwnProperty('flags') ||
 			!promptFilter[i].hasOwnProperty('replace')) continue;
@@ -1608,7 +1550,7 @@ function exportImport() {
 	let exportJSON = JSON.stringify({
 		savedSetting: conf.savedSetting,
 		currentQueue: conf.currentQueue,
-		scriptSettings: JSON.parse(localStorage.awqScriptSettings), // Use localstorage since it has filtered everything except values
+		scriptSettings: JSON.parse(localStorage.awqScriptSettings), //Use localstorage since it has filtered everything except values
 	});
 	let exportImportInput = document.getElementById('import-export-data-input');
 	let importJSON = exportImportInput.value;
@@ -1630,7 +1572,7 @@ function exportImport() {
 		let parsedImportJSON = JSON.parse(importJSON);
 		conf.savedSetting = parsedImportJSON.savedSetting;
 		conf.currentQueue = parsedImportJSON.currentQueue;
-		loadScriptSettings(parsedImportJSON.scriptSettings); // Load with loadScriptSettings to only replace values
+		loadScriptSettings(parsedImportJSON.scriptSettings); //Load with loadScriptSettings to only replace values
 		localStorage.awqScriptSettings = JSON.stringify(parsedImportJSON.scriptSettings);
 		localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
 		localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
@@ -1638,77 +1580,53 @@ function exportImport() {
 	}
 }
 function isJsonString(str) {
-	try {
-		JSON.parse(str);
-	} catch (e) {
-		return false;
-	}
+	try {JSON.parse(str)} catch(e) {return false}
 	return true;
 }
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
-function stringDiffCount(p_str1, p_str2) {
-	let count = 0;
-	for(let i = 0; i < p_str1.length; i++){
-		if(p_str1[i] === p_str2[i]){
-			continue;
-		};
-		count++;
-	};
-	return count;
-};
 function getCallStack() {
-	try {
-		throw new Error();
-	} catch (err) {
-		return err.stack.replace(/^getCallStack.*\n/, '');
-	}
+	try {throw new Error()}
+	catch(err) {return err.stack.replace(/^getCallStack.*\n/, '')}
 }
 
 function levenshteinDist(s1, s2) {
-		if (s1 === s2) {
-			return 0;
-		} else {
-			var s1_len = s1.length, s2_len = s2.length;
-			if (s1_len && s2_len) {
-				var i1 = 0, i2 = 0, a, b, c, c2, row = [];
-				while (i1 < s1_len) {
-					row[i1] = ++i1;
-				}
-				while (i2 < s2_len) {
-					c2 = s2.charCodeAt(i2);
-					a = i2;
-					++i2;
-					b = i2;
-					for (i1 = 0; i1 < s1_len; ++i1) {
-						c = a + (s1.charCodeAt(i1) === c2 ? 0 : 1);
-						a = row[i1];
-						b = b < a ? (b < c ? b + 1 : c) : (a < c ? a + 1 : c);
-						row[i1] = b;
-					}
-				}
-				return b;
-			} else {
-				return s1_len + s2_len;
+	if(s1 === s2) return 0;
+	else {
+		var s1_len = s1.length, s2_len = s2.length;
+		if(s1_len && s2_len) {
+			var i1 = 0, i2 = 0, a, b, c, c2, row = [];
+			while(i1 < s1_len) {
+				row[i1] = ++i1;
 			}
-		}
-};
-
+			while(i2 < s2_len) {
+				c2 = s2.charCodeAt(i2);
+				a = i2;
+				++i2;
+				b = i2;
+				for(i1 = 0; i1 < s1_len; ++i1) {
+					c = a + (s1.charCodeAt(i1) === c2 ? 0 : 1);
+					a = row[i1];
+					b = b < a ? (b < c ? b + 1 : c) : (a < c ? a + 1 : c);
+					row[i1] = b;
+				}
+			}
+			return b;
+		} else return s1_len + s2_len;
+	}
+}
 
 function getValueJSON(p_type) {
 	let type = p_type || conf.commonData.activeType;
 	awqLog('getValueJSON: type=' + type);
-	let valueJSON = {type:type};
+	let valueJSON = {type: type};
 
-	if(type == 'ext') { // Needs special saving since it's not an input but a tab switch
+	if(type == 'ext') { //Needs special saving since it's not an input but a tab switch
 		valueJSON.extrasMode = conf.ext.controls.extrasMode.filter((elem) => {
 			return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
 		})[0].name;
 		valueJSON.extrasResizeMode = conf.ext.controls.extrasResizeMode.filter((elem) => {
 			return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
 		})[0].name;
-	} else if(type == 'i2i') { // Needs special saving since it's not an input but a tab switch
+	} else if(type == 'i2i') { //Needs special saving since it's not an input but a tab switch
 		valueJSON.i2iMode = conf.i2i.controls.i2iMode.filter((elem) => {
 			return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
 		})[0].name;
@@ -1716,18 +1634,18 @@ function getValueJSON(p_type) {
 		return conf.extensions.iBrowser.functions.getValueJSON();
 	}
 
-	for (let prop in conf[type]) {
+	for(let prop in conf[type]) {
 		if(prop !== 'controls') {
 			try {
 				if(conf[type][prop].gradEl) {
 					valueJSON[prop] = getGradVal(conf[type][prop].gradEl);
-				} else if(conf[type][prop].el.classList.contains('input-accordion')) { // "input-accordion" (checkbox alternative)
+				} else if(conf[type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
 					valueJSON[prop] = conf[type][prop].el.classList.contains('input-accordion-open');
-				} else if(conf[type][prop].el.type == 'fieldset') { // Radio buttons
+				} else if(conf[type][prop].el.type == 'fieldset') { //Radio buttons
 					valueJSON[prop] = conf[type][prop].el.querySelector('input:checked').value;
 				} else if(conf[type][prop].el.type == 'checkbox') {
 					valueJSON[prop] = conf[type][prop].el.checked;
-				} else { // Inputs, Textarea
+				} else { //Inputs, Textarea
 					valueJSON[prop] = conf[type][prop].el.value;
 					if(prop == 'prompt') valueJSON[prop] = filterPrompt(valueJSON[prop]);
 					if(prop == 'negPrompt' && conf.scriptSettings.promptFilterNegative.value) valueJSON[prop] = filterPrompt(valueJSON[prop], true);
@@ -1749,49 +1667,49 @@ async function loadJson(p_json) {
 
 	let currentModel = getGradVal(conf.commonData.sdModelCheckpoint.gradEl);
 	if(currentModel == inputJSONObject.sdModelCheckpoint) {
-		awqLog('loadJson: Correct model already loaded: ' + currentModel);// No action needed
-	} else if(conf.commonData.sdModelCheckpoint.gradEl.props.choices.includes(inputJSONObject.sdModelCheckpoint)) { // Check if model exists
+		awqLog('loadJson: Correct model already loaded: ' + currentModel);//No action needed
+	} else if(conf.commonData.sdModelCheckpoint.gradEl.props.choices.includes(inputJSONObject.sdModelCheckpoint)) { //Check if model exists
 		awqLog('loadJson: Trying to load model: ' + inputJSONObject.sdModelCheckpoint);
 		setGradVal(conf.commonData.sdModelCheckpoint.gradEl, inputJSONObject.sdModelCheckpoint);
-		setCheckpointWithPost(inputJSONObject.sdModelCheckpoint); // Only setting gradio config no longer works?
+		setCheckpointWithPost(inputJSONObject.sdModelCheckpoint); //Only setting gradio config no longer works?
 	} else {
 		awqLogPublishError(`Model ${inputJSONObject.sdModelCheckpoint} was not found, using current model ${currentModel}`);
 	}
 
-	if(conf.commonData.activeType != inputJSONObject.type) await switchTabAndWait(inputJSONObject.type); // Switch tab?
+	if(conf.commonData.activeType != inputJSONObject.type) await switchTabAndWait(inputJSONObject.type); //Switch tab?
 
-	if(inputJSONObject.extrasResizeMode) await switchTabAndWaitUntilSwitched(inputJSONObject.extrasResizeMode, conf.ext.controls.extrasResizeMode); // Needs special loading since it's not an input but a tab switch
-	if(inputJSONObject.extrasMode) await switchTabAndWaitUntilSwitched(inputJSONObject.extrasMode, conf.ext.controls.extrasMode); // Needs special loading since it's not an input but a tab switch
+	if(inputJSONObject.extrasResizeMode) await switchTabAndWaitUntilSwitched(inputJSONObject.extrasResizeMode, conf.ext.controls.extrasResizeMode); //Needs special loading since it's not an input but a tab switch
+	if(inputJSONObject.extrasMode) await switchTabAndWaitUntilSwitched(inputJSONObject.extrasMode, conf.ext.controls.extrasMode); //Needs special loading since it's not an input but a tab switch
 
-	if(inputJSONObject.i2iMode) await switchTabAndWaitUntilSwitched(inputJSONObject.i2iMode, conf.i2i.controls.i2iMode); // Needs special loading since it's not an input but a tab switch
+	if(inputJSONObject.i2iMode) await switchTabAndWaitUntilSwitched(inputJSONObject.i2iMode, conf.i2i.controls.i2iMode); //Needs special loading since it's not an input but a tab switch
 
 	let loadOutput = 'loadJson: loaded: ';
 
-	for (let prop in inputJSONObject) {
+	for(let prop in inputJSONObject) {
 		let triggerOnBaseElem = true;
-		if(['type','extrasMode','extrasResizeMode','sdModelCheckpoint', 'i2iMode'].includes(prop)) continue;
+		if(['type', 'extrasMode', 'extrasResizeMode', 'sdModelCheckpoint', 'i2iMode'].includes(prop)) continue;
 		try {
 			if(oldData[prop] != inputJSONObject[prop]) loadOutput += `${prop}:${oldData[prop]}-->${inputJSONObject[prop]} | `;
 
 			if(conf[type][prop].el) {
 				if(conf[type][prop].el.type == 'fieldset') {
-					triggerOnBaseElem = false; // No need to trigger this on base element
+					triggerOnBaseElem = false; //No need to trigger this on base element
 					conf[type][prop].el.querySelector('[value="' + inputJSONObject[prop] + '"]').checked = true;
 					triggerChange(conf[type][prop].el.querySelector('[value="' + inputJSONObject[prop] + '"]'));
-				} else if(conf[type][prop].el.classList.contains('input-accordion')) { // "input-accordion" (checkbox alternative)
+				} else if(conf[type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
 					let currentValue = conf[type][prop].el.classList.contains('input-accordion-open');
 					if(inputJSONObject[prop] != currentValue) {
 						conf[type][prop].el.querySelector('.label-wrap').click();
 					}
 
-				} else if(conf[type][prop].el.type == 'select-one') { // Select
-					if(conf[type][prop].el.checked == inputJSONObject[prop]) triggerOnBaseElem = false; // Not needed
+				} else if(conf[type][prop].el.type == 'select-one') { //Select
+					if(conf[type][prop].el.checked == inputJSONObject[prop]) triggerOnBaseElem = false; //Not needed
 					conf[type][prop].el.value = inputJSONObject[prop];
 				} else if(conf[type][prop].el.type == 'checkbox') {
-					if(conf[type][prop].el.checked == inputJSONObject[prop]) triggerOnBaseElem = false; // Prevent checbox getting toggled
+					if(conf[type][prop].el.checked == inputJSONObject[prop]) triggerOnBaseElem = false; //Prevent checbox getting toggled
 					conf[type][prop].el.checked = inputJSONObject[prop];
-				} else { // Input, Textarea
-					if(conf[type][prop].el.value == inputJSONObject[prop]) triggerOnBaseElem = false; // Fixes svelte error
+				} else { //Input, Textarea
+					if(conf[type][prop].el.value == inputJSONObject[prop]) triggerOnBaseElem = false; //Fixes svelte error
 					conf[type][prop].el.value = inputJSONObject[prop];
 				}
 				if(conf[type][prop].el2) {
@@ -1815,12 +1733,12 @@ async function loadJson(p_json) {
 
 function waitForElm(selector) {
 	return new Promise(resolve => {
-		if (document.querySelector(selector)) {
+		if(document.querySelector(selector)) {
 			return resolve(document.querySelector(selector));
 		}
 
 		const observer = new MutationObserver(mutations => {
-			if (document.querySelector(selector)) {
+			if(document.querySelector(selector)) {
 				resolve(document.querySelector(selector));
 				observer.disconnect();
 			}
@@ -1833,15 +1751,15 @@ function waitForElm(selector) {
 	});
 }
 function setCheckpointWithPost(p_target_cp) {
-	awqLog('setCheckpointWithPost: '+ p_target_cp);
-	let targetCheckpoint = p_target_cp.replace('/','//').replace('\\','\\\\');
+	awqLog('setCheckpointWithPost: ' + p_target_cp);
+	let targetCheckpoint = p_target_cp.replace('/', '//').replace('\\', '\\\\');
 
-	// Try to find fn_index for the switch checkpoint "function"
+	//Try to find fn_index for the switch checkpoint "function"
 	let checkPointGradioElemId = conf.commonData.sdModelCheckpoint.gradEl.id;
 	let fnIndex = gradio_config.dependencies.filter(comp => comp.inputs[0] == checkPointGradioElemId);
 	fnIndex = fnIndex ? gradio_config.dependencies.indexOf(fnIndex[0]) : null;
 	if(fnIndex) {
-		awqLog('setCheckpointWithPost: found fn_index '+ fnIndex);
+		awqLog('setCheckpointWithPost: found fn_index ' + fnIndex);
 	} else {
 		awqLogPublishError('setCheckpointWithPost: failed to find fn_index for model change');
 		return;
@@ -1861,10 +1779,10 @@ function setCheckpointWithPost(p_target_cp) {
 
 function triggerChange(p_elem) {
 	let evt = document.createEvent("HTMLEvents");
-	evt.initEvent("change", false, true); // Needed for script to update subsection
+	evt.initEvent("change", false, true); //Needed for script to update subsection
 	p_elem.dispatchEvent(evt);
 	evt = document.createEvent("HTMLEvents");
-	evt.initEvent("input", false, true); // Needded for webui to register changed settings
+	evt.initEvent("input", false, true); //Needded for webui to register changed settings
 	p_elem.dispatchEvent(evt);
 }
 
@@ -1877,7 +1795,7 @@ function findGradioComponentStateByLabel(p_elem_label) {
 function getGradVal(p_grad_comp) {
 	return p_grad_comp.props.value;
 }
-function setGradVal(p_grad_comp,p_val) {
+function setGradVal(p_grad_comp, p_val) {
 	p_grad_comp.props.value = p_val;
 }
 
