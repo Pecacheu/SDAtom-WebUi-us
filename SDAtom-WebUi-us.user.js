@@ -1,7 +1,7 @@
 //==UserScript==
 //@name         SDAtom-WebUi-us
 //@namespace    SDAtom-WebUi-us
-//@version      1.4.3
+//@version      1.4.4
 //@description  Queue for AUTOMATIC1111 WebUi and an option to saving settings
 //@author       Kryptortio
 //@homepage     https://github.com/Kryptortio/SDAtom-WebUi-us
@@ -16,6 +16,20 @@
 
 const c_scriptVersion = typeof GM_info == 'undefined' ? '1.3.2' : GM_info.script.version,
 c_scriptHandeler = typeof GM_info == 'undefined' ? '(not user script)' : GM_info.scriptHandler;
+
+//From https://github.com/Pecacheu/Utils.js
+//Create element of type with parent, className, style object, and innerHTML string
+//(Just remember the order PCSI!) Use null to leave any parameter blank
+const utils = {};
+utils.mkEl = (t,p,c,s,i) => {
+	const e=document.createElement(t);
+	if(c!=null) e.className=c; if(i!=null) e.innerHTML=i;
+	if(s && typeof s=='object') for(let k in s) {
+		if(k in e.style) e.style[k]=s[k]; else e.style.setProperty(k,s[k]);
+	}
+	if(p!=null) p.appendChild(e); return e;
+}
+utils.mkDiv = (p,c,s,i) => utils.mkEl('div',p,c,s,i);
 
 //----------------------------------------------------------------------------- Config
 let conf = {
@@ -225,9 +239,8 @@ let conf = {
 			functions: {
 				getValueJSON: () => {
 					awqLog('iBrowser.getValueJSON: parsing data');
-					let valueJSON = {type: 't2i'};
-
-					let currentTab = document.querySelector('#image_browser_tabs_container button.selected').innerHTML;
+					let valueJSON = {type: 't2i'},
+					currentTab = document.querySelector('#image_browser_tabs_container button.selected').innerHTML;
 					currentTab = currentTab.replace(/\s/g, '');
 					currentTab = currentTab.replace('-grids', 'G').toLowerCase(),
 					generationInfoValue = conf.extensions.iBrowser.guiElems[currentTab].el.value;
@@ -250,21 +263,10 @@ let conf = {
 					valueJSON['prompt'] = '', valueJSON['negPrompt'] = '';
 
 					for(let l of lines) {
-						if(l.startsWith("Negative prompt: ")) {
-							whichLine = 1;
-							l = l.substring(17);
-						}
-						else if(l.startsWith("Template: ")) {
-							whichLine = 2;
-							l = l.substring(10);
-						}
-						else if(l.startsWith("Negative Template: ")) {
-							whichLine = 3;
-							l = l.substring(19);
-						}
-						else if(l.startsWith("Steps: ")) {
-							whichLine = 4;
-						}
+						if(l.startsWith("Negative prompt: ")) whichLine = 1, l = l.slice(17);
+						else if(l.startsWith("Template: ")) whichLine = 2, l = l.slice(10);
+						else if(l.startsWith("Negative Template: ")) whichLine = 3, l = l.slice(19);
+						else if(l.startsWith("Steps: ")) whichLine = 4;
 
 						switch(whichLine) {
 						case 0:
@@ -321,7 +323,7 @@ let conf = {
 	},
 	ui: {},
 	scriptSettings: {
-		defaultQuantity: {name: "Default queue quantity", description: "Default number of times to execute each queue item", type: "numeric", value: 1},
+		defaultQty: {name: "Default queue quantity", description: "Default number of times to execute each queue item", type: "numeric", value: 1},
 		rememberQueue: {name: "Remember queue", description: "Remember the queue if you reload the page", type: "boolean", value: true},
 		stayReady: {name: "Stay ready", description: "Remain ready after end-of-queue until manually stopped", type: "boolean", value: false},
 		notificationSound: {name: "Notification sound", description: "Sound to be played when processing of queue items stops", type: "boolean", value: true},
@@ -355,13 +357,13 @@ if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnPr
 	if(localStorage.hasOwnProperty("awqExtensionScript"))
 		conf.scriptSettings.extensionScript.value = localStorage.awqExtensionScript;
 }
+
 const c_emptyQueueString = 'Queue is empty',
-c_addToQueueButtonText = 'Add to queue',
-c_processButtonText = 'Process queue',
+c_addQueueText = 'Add to queue',
+c_addQueueDesc = "Add an item to the queue according to current tab and settings",
+c_addQueueDescAlt = c_addQueueDesc+" and overwrite with Alt ",
+c_processButtonText = "Process Queue",
 c_defaultTextStoredSettings = "Stored settings",
-c_innerUIWidth = 'calc(100vw - 20px)',
-c_uiElemntHeight = '25px',
-c_uiElemntHeightSmall = '18px',
 c_audio_base64 = new Audio('data:audio/mpeg;base64,//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVR9DU02wxI2HBY0xzzTPHVjsaEggIYbBQymbZ5et+lSLLDAPL2LcegkDNlkiLYgIBgMoIRxodnFVNMu2pmYwSfDSC2CxTFDKowcoycCimGKGFhYRCx50EjDS05dCEXJaIRTRHMTQfkO/U/sjuSEa5wroVM0a2hmXr0oA7JasD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V///+YGDIYDB4HGBRAYjCABAQMAOrVXeNb/////QYBwSBIETHQhBgBRAMGgq1lV3jW13f//////ogl+UTWeJbqBIMiQBa6X2STL/Y1tdq75lrtXf///////44AURAYAVhE+lMmFrcRNYQqJhyhq4FhWjY1tdx/mWu475lrv//////////rTVMnql4XBZApWX+aWuRL1jSmZf5pbEEvXQWDS+Z+yzHfK2u1d8y12rtFKTRUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAOAAAAAAA0gBwAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
 
 const c_defaultOtputConsoleText = "Here you will see some information about what the script is doing",
@@ -380,20 +382,15 @@ function awqLog(p_message) {
 }
 
 function awqLogPublishMsg(p_message, p_color) {
-	if(!conf.ui.outputConsole) return;
-	if(conf.ui.outputConsole.innerHTML.match('console-description')) {
-		let ASDWUIVerText = '<span style="font-size: 0.9em;">' + conf.commonData.versionContainer.el.textContent + '</span>';
-		conf.ui.outputConsole.innerHTML = `* Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${navigator.userAgent} stable-diffusion-webui version ${ASDWUIVerText}`;
-	}
-	let lines = conf.ui.outputConsole.querySelectorAll('div');
-	let line = document.createElement('div');
-	line.className = 'awq-console-line';
-	const timestamp = (new Date()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
-	line.innerHTML = '<span style="' + (p_color ? 'color:' + p_color : '') + '">' + timestamp + ': ' + p_message + '</span>';
-	conf.ui.outputConsole.appendChild(line);
+	if(!conf.ui.msgConsole) return;
+	if(conf.ui.msgConsole.innerHTML.match('console-description'))
+		conf.ui.msgConsole.innerHTML = `* Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${navigator.userAgent} stable-diffusion-webui version <span style="font-size: 0.9em;">${conf.commonData.versionContainer.el.textContent}</span>`;
 
-	if(conf.ui.outputConsole.childElementCount >= conf.scriptSettings.maxOutputLines.value) conf.ui.outputConsole.firstChild.remove();
-	if(conf.scriptSettings.autoscrollOutput.value) conf.ui.outputConsole.scrollTo(0, conf.ui.outputConsole.scrollHeight);
+	const timestamp = (new Date()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+	utils.mkDiv(conf.ui.msgConsole, null, null, `<span style="${p_color ? 'color:' + p_color : ''}">${timestamp}: ${p_message}</span>`);
+
+	if(conf.ui.msgConsole.childElementCount >= conf.scriptSettings.maxOutputLines.value) conf.ui.msgConsole.firstChild.remove();
+	if(conf.scriptSettings.autoscrollOutput.value) conf.ui.msgConsole.scrollTo(0, conf.ui.msgConsole.scrollHeight);
 }
 
 function awqLogPublishError(p_message) {awqLogPublishMsg(p_message, 'red')}
@@ -434,35 +431,6 @@ function initAWQ() {
 		}
 	}
 
-	loadScriptSettings();
-	generateMainUI();
-
-	try {throw new Error()} catch(e) {awqLog(`initAWQ: stack = ${e.stack.replace(/^(.*?)\binitAWQ/s, '')}`)}
-
-	try {eval(conf.scriptSettings.extensionScript.value)} catch(e) {awqLogPublishMsg(`Failed to load extension script, error: <pre>${e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
-
-	function mapElementsToConf(p_object, p_info) {
-		for(let prop in p_object) {
-			if(p_object[prop].sel) {
-				p_object[prop].el = conf.shadowDOM.root.querySelector(p_object[prop].sel);
-				if(!p_object[prop].el) awqLogPublishError(`Failed to find the ${p_info} ${prop}`);
-			}
-			if(p_object[prop].sel2) {
-				p_object[prop].el2 = conf.shadowDOM.root.querySelector(p_object[prop].sel2);
-				if(!p_object[prop].el2) awqLogPublishError(`Failed to find the secondary ${p_info} ${prop}`);
-			}
-			if(p_object[prop].grad) {
-				let gradIndex = p_object[prop].gradIndex ? p_object[prop].gradIndex : 0;
-				p_object[prop].gradEl = findGradioComponentState(p_object[prop].grad)[gradIndex];
-				if(!p_object[prop].gradEl) awqLogPublishError(`Failed to find the gradio element ${p_info} ${prop}`);
-			}
-			if(p_object[prop].gradLab) {
-				p_object[prop].gradEl = findGradioComponentStateByLabel(p_object[prop].gradLab)[0];
-				if(!p_object[prop].gradEl) awqLogPublishError(`Failed to find the gradio element ${p_info} ${prop}`);
-			}
-		}
-	}
-
 	mapElementsToConf(conf.commonData, 'main object');
 	mapElementsToConf(conf.t2i, 't2i object');
 	mapElementsToConf(conf.t2i.controls, 't2i control');
@@ -473,385 +441,314 @@ function initAWQ() {
 	if(conf.extensions.iBrowser) waitForElm(conf.extensions.iBrowser.guiElems.txt2img.sel)
 		.then(() => mapElementsToConf(conf.extensions.iBrowser.guiElems, 'iBrowser objects'));
 
+	loadScriptSettings();
+	generateMainUI();
+
+	try {eval(conf.scriptSettings.extensionScript.value)} catch(e) {awqLogPublishMsg(`Failed to load extension script, error: <pre>${e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
+
 	setInterval(updateStatus, c_wait_tick_duration);
 }
 
-function appendAddToQueueButton(container, top, innerHTML, onclick, title, right) {
-	let button = document.createElement('button');
-	button.innerHTML = innerHTML;
-	button.style.height = c_uiElemntHeight;
-	button.style.color = 'black';
-	button.style.position = 'fixed';
-	button.style.top = top + 'px';
-	button.style.right = right ? right + 'px' : 0;
-	button.style.opacity = conf.scriptSettings.buttonOpacity.value;
-	button.onclick = onclick;
-	button.style.cursor = "pointer";
-	button.title = title;
-	button.classList.add('awq-hover-button');
-	container.appendChild(button);
-	return button;
+function mapElementsToConf(p_object, p_info) {
+	for(let prop in p_object) {
+		if(p_object[prop].sel) {
+			p_object[prop].el = conf.shadowDOM.root.querySelector(p_object[prop].sel);
+			if(!p_object[prop].el) awqLogPublishError(`Failed to find the ${p_info} ${prop}`);
+		}
+		if(p_object[prop].sel2) {
+			p_object[prop].el2 = conf.shadowDOM.root.querySelector(p_object[prop].sel2);
+			if(!p_object[prop].el2) awqLogPublishError(`Failed to find the secondary ${p_info} ${prop}`);
+		}
+		if(p_object[prop].grad) {
+			let gradIndex = p_object[prop].gradIndex ? p_object[prop].gradIndex : 0;
+			p_object[prop].gradEl = findGradioComponentState(p_object[prop].grad)[gradIndex];
+			if(!p_object[prop].gradEl) awqLogPublishError(`Failed to find the gradio element ${p_info} ${prop}`);
+		}
+		if(p_object[prop].gradLab) {
+			p_object[prop].gradEl = findGradioComponentStateByLabel(p_object[prop].gradLab)[0];
+			if(!p_object[prop].gradEl) awqLogPublishError(`Failed to find the gradio element ${p_info} ${prop}`);
+		}
+	}
+}
+
+function appendQueueBtn(parent, name, onclick, tip) {
+	let btn = utils.mkEl('button', parent, null, null, name);
+	btn.onclick = onclick, btn.title = tip;
+	return btn;
 }
 
 function generateMainUI() {
-	let awqCSSElem = document.createElement('style');
-	awqCSSElem.innerHTML = `
-#AWQ-container {
-	background:var(--background-fill-primary);
+	utils.mkEl('style', document.head, null, null, `
+.AWQ-box input, .AWQ-box input[type=number], .AWQ-box select,
+.AWQ-console > div, .awq-popup input, .awq-popup textarea {
+	height:25px; vertical-align:top;
+	box-shadow:var(--input-shadow);
+	border:var(--input-border-width) solid var(--input-border-color);
+	border-radius:var(--input-radius);
+	background:var(--input-background-fill);
+	color:var(--body-text-color);
+	margin-right:5px; padding:2px 10px;
+	font-size:100%; appearance:auto;
+	scrollbar-width:thin;
 }
-#AWQ-container button {
+.awq-popup :not(button) { color:var(--block-title-text-color); }
+.awq-popup, .awq-popup * { box-sizing:border-box; }
+.awq-popup {
+	position:fixed; top:0; left:0; width:100%; height:100%;
+	padding:30px 5%; z-index:9999; overflow-y:auto;
+	font-family:sans-serif;
+}
+.awq-popup > div {
+	width:100%; padding:20px;
+	border-radius:15px; background:var(--background-fill-primary);
+	box-shadow:3px 3px 100px black, 3px 3px 500px black, 3px 3px 25px black;
+}
+.awq-hdr {
+	display:flex; justify-content:space-between;
+	margin-bottom:10px;
+}
+.awq-settings {
+	display:grid; grid-auto-flow:row; gap:15px;
+	grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+}
+.awq-popup input:not([type=checkbox]), .awq-popup textarea { width:100%; margin:0; }
+.awq-popup input[type=checkbox] { vertical-align:middle; margin:0 5px; }
+.awq-popup button { margin:5px 0; }
+.awq-popup button:last-child { margin-bottom:0; }
+.awq-popup textarea { min-height:40px; resize:vertical; }
+
+.AWQ-box button, .AWQ-overlay button, .awq-popup button {
+	display:inline-block; height:25px; cursor:pointer;
 	border:var(--button-border-width) solid var(--button-secondary-border-color);
 	background:var(--button-secondary-background-fill);
 	color:var(--button-secondary-text-color);
+	border-radius:var(--input-radius);
+	margin-right:5px; padding: 0 5px;
 }
-#AWQ-container input, #AWQ-container select, #AWQ-container .awq-console-line,
-#awq-script-settings-popup input, #awq-script-settings-popup textarea {
-	box-shadow: var(--input-shadow);
-	border: var(--input-border-width) solid var(--input-border-color);
-	border-radius: var(--input-radius);
-	background: var(--input-background-fill);
-	color: var(--body-text-color);
-}
-#AWQ-container input.completed-queue-item {
+.AWQ-console > div { border-radius:unset; margin:0; padding:2px; }
+.AWQ-box input.completed-queue-item {
 	background:var(--button-secondary-background-fill);
 	color:var(--button-secondary-text-color);
 }
-#AWQ-container .awq-console-line {
-	border-radius: unset;
+.AWQ-console {
+	width:100%; height:160px;
+	margin:5px 0; overflow:auto; color:gray;
+	box-shadow:inset 0px 1px 4px #666;
 }
-#awq-script-settings-popup {
-	background:var(--background-fill-primary);
+.AWQ-queue { width:100%; margin-top:5px; color:gray; }
+.AWQ-queue > div { display:flex; margin-bottom:5px; }
+.AWQ-item-type { width:30px; text-align:center; }
+.AWQ-item-type, .AWQ-item-JSON { padding:2px !important; }
+.AWQ-item-qty { width:50px; }
+.AWQ-item-JSON {
+	flex-grow:1; margin:0 !important;
+	text-overflow:ellipsis;
 }
-#awq-script-settings-popup label, #awq-script-settings-popup span {
-	color: var(--block-title-text-color);
-}`;
-	document.head.appendChild(awqCSSElem);
 
-	let container = document.createElement('div');
-	container.id = 'AWQ-container';
-	container.className = document.querySelector('gradio-app > div').classList.contains('dark') ? 'dark' : '';
-	container.style.width = c_innerUIWidth;
-	container.style.border = "1px solid white";
-	container.style.position = "relative";
-	container.style.zIndex = "2147483647";
-	document.body.appendChild(container);
-	conf.ui.container = container;
+.AWQ-overlay {
+	position:fixed; top:0; right:0;
+	width:100px; z-index:99;
+}
+.AWQ-overlay div { display:flex; }
+.AWQ-overlay button {
+	width:100%; flex-grow:1;
+	margin:0; color:#000;
+	border-radius:0;
+}`);
 
-	let addToQueueButton = appendAddToQueueButton(container, 0, c_addToQueueButtonText, appendQueueItem, "Add an item to the queue according to current tab and settings");
-	let addToQueueButtonA1 = appendAddToQueueButton(container, 25, 'A1', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value))}, "Add an item to the queue according to current tab and settings and overwrite with Alt 1", 63);
-	let addToQueueButtonA2 = appendAddToQueueButton(container, 25, 'A2', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings2.value))}, "Add an item to the queue according to current tab and settings and overwrite with Alt 2", 32);
-	let addToQueueButtonA3 = appendAddToQueueButton(container, 25, 'A3', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value))}, "Add an item to the queue according to current tab and settings and overwrite with Alt 3", 1);
+	let msgBox = utils.mkDiv(null, 'AWQ-box block gradio-accordion'),
+	tabs = document.querySelector('#tabs');
+	tabs.parentElement.insertBefore(msgBox, tabs.nextElementSibling);
+	conf.ui.msgBox = msgBox;
 
-	let defaultQueueQuantity = document.createElement('input');
-	defaultQueueQuantity.placeholder = 'Def #';
-	defaultQueueQuantity.style.height = c_uiElemntHeightSmall;
-	defaultQueueQuantity.style.width = '50px';
-	defaultQueueQuantity.type = 'number';
-	defaultQueueQuantity.title = "How many items of each will be added to the queue (default is 1)";
-	defaultQueueQuantity.value = conf.scriptSettings.defaultQuantity.value;
-	container.appendChild(defaultQueueQuantity);
-	defaultQueueQuantity.onchange = function() {conf.scriptSettings.defaultQuantity.value = this.value}
-	defaultQueueQuantity.onfocus = function() {this.select()}
+	let overlay = utils.mkDiv(document.body, 'AWQ-overlay', {opacity:conf.scriptSettings.buttonOpacity.value});
+	conf.ui.overlay = overlay;
 
-	let assignDefaultToAll = document.createElement('button');
-	assignDefaultToAll.innerHTML = '⤵';
-	assignDefaultToAll.style.cursor = "pointer";
-	assignDefaultToAll.title = "Assign the default value to all queue items";
-	assignDefaultToAll.style.height = c_uiElemntHeight;
-	assignDefaultToAll.style.marginRight = '10px';
-	assignDefaultToAll.onclick = () => {
-		if(conf.scriptSettings.defaultQuantity.value >= 0) {
-			document.querySelectorAll('.AWQ-item-quantity').forEach((inp) => {inp.value = conf.scriptSettings.defaultQuantity.value});
+	appendQueueBtn(overlay, c_addQueueText, appendQueueItem, c_addQueueDesc);
+	let qbCont = utils.mkDiv(overlay);
+	appendQueueBtn(qbCont, 'A1', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value))}, c_addQueueDescAlt+1);
+	appendQueueBtn(qbCont, 'A2', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings2.value))}, c_addQueueDescAlt+2);
+	appendQueueBtn(qbCont, 'A3', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value))}, c_addQueueDescAlt+3);
+
+	let defQueueQty = utils.mkEl('input', msgBox, null, {width:'50px'});
+	defQueueQty.type = 'number';
+	defQueueQty.title = "How many items of each will be added to the queue (default is 1)";
+	defQueueQty.value = conf.scriptSettings.defaultQty.value;
+	defQueueQty.onchange = function() {conf.scriptSettings.defaultQty.value = this.value}
+	defQueueQty.onfocus = function() {this.select()}
+	conf.ui.defQueueQty = defQueueQty;
+
+	let assignDefVal = utils.mkEl('button', msgBox, null, null, '⤵');
+	assignDefVal.title = "Assign the default value to all queue items";
+	assignDefVal.onclick = () => {
+		if(conf.scriptSettings.defaultQty.value >= 0) {
+			document.querySelectorAll('.AWQ-item-qty').forEach((inp) => {inp.value = conf.scriptSettings.defaultQty.value});
 			updateQueueState();
 		}
-	container.appendChild(assignDefaultToAll);
 	}
 
-	let processButton = document.createElement('button');
-	processButton.innerHTML = c_processButtonText;
-	processButton.style.height = c_uiElemntHeight;
-	processButton.style.cursor = "pointer";
-	processButton.title = "Start processing the queue, click again to stop";
-	processButton.onclick = () => toggleProcessButton();
-	conf.ui.processButton = processButton;
-	container.appendChild(processButton);
+	let processBtn = utils.mkEl('button', msgBox, null, null, c_processButtonText);
+	processBtn.title = "Start processing the queue, click again to stop";
+	processBtn.onclick = () => toggleProcessButton();
+	conf.ui.processBtn = processBtn;
 
-	let clearButton = document.createElement('button');
-	clearButton.innerHTML = "Clear queue";
-	clearButton.style.marginLeft = "5px";
-	clearButton.style.height = c_uiElemntHeight;
-	clearButton.style.cursor = "pointer";
-	clearButton.title = "Empty the queue completely";
-	clearButton.onclick = () => {
+	let clearBtn = utils.mkEl('button', msgBox, null, null, "Clear Queue");
+	clearBtn.title = "Empty the queue completely";
+	clearBtn.onclick = () => {
 		if(!confirm('Are you sure you want to remove everything in your queue?')) return;
-		queueContainer.innerHTML = c_emptyQueueString;
+		conf.ui.queueCont.innerHTML = c_emptyQueueString;
 		let oldQueueLength = conf.currentQueue.length;
 		conf.currentQueue = [];
 		updateQueueState();
 		awqLogPublishMsg(`Queue has been cleared, ${oldQueueLength} items removed`);
 	}
-	container.appendChild(clearButton);
 
-	let scriptSettingsButton = document.createElement('button');
-	scriptSettingsButton.innerHTML = "Script settings";
-	scriptSettingsButton.style.float = 'right';
-	scriptSettingsButton.style.height = c_uiElemntHeight;
-	scriptSettingsButton.style.cursor = "pointer";
-	scriptSettingsButton.title = "Open the settings popup for the script";
-	scriptSettingsButton.onclick = openScriptSettingsPopup;
-	container.appendChild(scriptSettingsButton);
+	let settingsBtn = utils.mkEl('button', msgBox, null, {float:'right', margin:0}, "Settings");
+	settingsBtn.title = "Open the script settings menu";
+	settingsBtn.onclick = openSettings;
 
-	let queueContainer = document.createElement('div');
-	queueContainer.style.width = c_innerUIWidth;
-	queueContainer.style.border = "1px solid white";
-	queueContainer.style.color = "gray";
-	queueContainer.style.marginBottom = "5px";
-	queueContainer.innerHTML = c_emptyQueueString;
-	container.appendChild(queueContainer);
+	conf.ui.queueCont = utils.mkDiv(msgBox, 'AWQ-queue', null, c_emptyQueueString);
 
-	let clearSettingButton = document.createElement('button');
-	clearSettingButton.innerHTML = "❌";
-	clearSettingButton.style.height = c_uiElemntHeight;
-	clearSettingButton.style.background = 'none';
-	clearSettingButton.onclick = clearSetting;
-	clearSettingButton.style.cursor = "pointer";
-	clearSettingButton.title = "Remove the currently selected setting";
-	container.appendChild(clearSettingButton);
+	let clearSettingsBtn = utils.mkEl('button', msgBox, null, {background:'none'}, '❌');
+	clearSettingsBtn.title = "Remove the currently selected setting";
+	clearSettingsBtn.onclick = clearSetting;
 
-	let settingsStorage = document.createElement('select');
-	settingsStorage.style.height = c_uiElemntHeight;
-	settingsStorage.title = "List of stored settings (template of all settings)";
-	container.appendChild(settingsStorage);
+	let setStore = utils.mkEl('select', msgBox);
+	setStore.title = "List of stored settings (template of all settings)";
+	conf.ui.settingsStorage = setStore;
 
-	let editSettingButton = document.createElement('button');
-	editSettingButton.innerHTML = "✏️";
-	editSettingButton.style.height = c_uiElemntHeight;
-	editSettingButton.onclick = editSetting;
-	editSettingButton.style.cursor = "pointer";
-	editSettingButton.title = "Edit the currently selected setting (a property can be removed to not change it when loading)";
-	container.appendChild(editSettingButton);
+	let editBtn = utils.mkEl('button', msgBox, null, null, '✏️');
+	editBtn.title = "Edit the currently selected setting (a property can be removed to not change it when loading)";
+	editBtn.onclick = editSetting;
 
-	let loadSettingButton = document.createElement('button');
-	loadSettingButton.innerHTML = "Load";
-	loadSettingButton.style.height = c_uiElemntHeight;
-	loadSettingButton.onclick = loadSetting;
-	loadSettingButton.style.cursor = "pointer";
-	loadSettingButton.title = "Load the currently selected setting (replacing current settings)";
-	container.appendChild(loadSettingButton);
+	let loadSettingsBtn = utils.mkEl('button', msgBox, null, null, "Load");
+	loadSettingsBtn.innerHTML = "Load";
+	loadSettingsBtn.title = "Load the currently selected setting (replacing current settings)";
+	loadSettingsBtn.onclick = loadSetting;
 
-	let settingName = document.createElement('input');
+	let settingName = utils.mkEl('input', msgBox);
 	settingName.placeholder = "Setting name";
-	settingName.style.height = c_uiElemntHeightSmall;
 	settingName.title = "Name to use when saving a new setting (duplicates not allowed)";
-	container.appendChild(settingName);
 	settingName.onfocus = function() {this.select()}
-
-	let saveSettingButton = document.createElement('button');
-	saveSettingButton.innerHTML = "Save";
-	saveSettingButton.style.height = c_uiElemntHeight;
-	saveSettingButton.onclick = saveSettings;
-	saveSettingButton.style.cursor = "pointer";
-	saveSettingButton.title = "Save currently selected settings so that you can load them again later";
-	container.appendChild(saveSettingButton);
-
-	let outputConsole = document.createElement('div');
-	outputConsole.title = c_defaultOtputConsoleText;
-	outputConsole.innerHTML = c_defaultOtputConsoleTextHTML;
-	outputConsole.style.width = 'calc(100vw - 50px)';
-	outputConsole.style.border = "1px solid black";
-	outputConsole.style.color = "gray";
-	outputConsole.style.padding = "2px";
-	outputConsole.style.marginTop = "5px";
-	outputConsole.style.marginBottom = "5px";
-	outputConsole.style.marginLeft = "15px";
-	outputConsole.style.marginRight = "15px";
-	outputConsole.style.height = (16 * 10) + "px";
-	outputConsole.style.overflow = "auto";
-	outputConsole.style.boxShadow = 'inset 0px 1px 4px #666';
-	container.appendChild(outputConsole);
-
-	let outputConsoleClearButton = document.createElement('button');
-	outputConsoleClearButton.innerHTML = "Clear";
-	outputConsoleClearButton.style.height = c_uiElemntHeight;
-	outputConsoleClearButton.onclick = () => {conf.ui.outputConsole.innerHTML = c_defaultOtputConsoleTextHTML}
-	outputConsoleClearButton.style.cursor = "pointer";
-	outputConsoleClearButton.style.marginLeft = "10px";
-	outputConsoleClearButton.title = "Clear the console above";
-	container.appendChild(outputConsoleClearButton);
-
-	conf.ui.addToQueueButton = addToQueueButton;
-	conf.ui.addToQueueButtonA1 = addToQueueButtonA1;
-	conf.ui.addToQueueButtonA2 = addToQueueButtonA2;
-	conf.ui.addToQueueButtonA3 = addToQueueButtonA3;
-	conf.ui.queueContainer = queueContainer;
-	conf.ui.clearButton = clearButton;
-	conf.ui.loadSettingButton = loadSettingButton;
 	conf.ui.settingName = settingName;
-	conf.ui.settingsStorage = settingsStorage;
-	conf.ui.defaultQueueQuantity = defaultQueueQuantity;
-	conf.ui.outputConsole = outputConsole;
 
-	document.querySelector('.gradio-container').style.overflow = 'visible'; // Fix so that a dropdown menu can overlap the queue
+	let saveBtn = utils.mkEl('button', msgBox, null, null, "Save");
+	saveBtn.title = "Save currently selected settings so that you can load them again later";
+	saveBtn.onclick = saveSettings;
+
+	let msgConsole = utils.mkDiv(msgBox, 'AWQ-console', null, c_defaultOtputConsoleTextHTML)
+	msgConsole.title = c_defaultOtputConsoleText;
+	conf.ui.msgConsole = msgConsole;
+
+	let msgClearBtn = utils.mkEl('button', msgBox, null, null, "Clear");
+	msgClearBtn.title = "Clear the console above";
+	msgClearBtn.onclick = () => {conf.ui.msgConsole.innerHTML = c_defaultOtputConsoleTextHTML}
+
+	document.querySelector('.gradio-container').style.overflow = 'visible'; //Fix so that a dropdown menu can overlap the queue
 	refreshSettings();
 
 	if(conf.currentQueue.length > 0) {
 		awqLog('Loaded saved queue:' + conf.currentQueue.length);
 		for(let i = 0; i < conf.currentQueue.length; ++i)
-			appendQueueItem(conf.currentQueue[i].quantity, conf.currentQueue[i].value, conf.currentQueue[i].type);
+			appendQueueItem(conf.currentQueue[i].qty, conf.currentQueue[i].value, conf.currentQueue[i].type);
 		updateQueueState();
 	}
 	awqLog('generateMainUI: Completed');
 }
 
-function appendQueueItem(p_quantity, p_value, p_type, p_overwrite_data) {
-	awqLog('appendQueueItem: quantity:' + p_quantity + ' type:' + p_type);
-	let quantity = isNaN(p_quantity) || p_quantity == null ?
-		(parseInt(conf.ui.defaultQueueQuantity.value) > 0 ?
-			parseInt(conf.ui.defaultQueueQuantity.value) : 1) : p_quantity;
+function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
+	awqLog(`appendQueueItem: qty:${p_qty} type:${p_type}`);
 
-	let queueItem = document.createElement('div');
-	queueItem.style.width = c_innerUIWidth;
-	let itemType = document.createElement('input');
-	itemType.classList = 'AWQ-item-type';
-	itemType.style.display = "50px";
-	itemType.style.height = c_uiElemntHeightSmall;
-	itemType.style.width = "20px";
+	if(conf.ui.queueCont.innerHTML == c_emptyQueueString) conf.ui.queueCont.innerHTML = '';
+	let queueItm = utils.mkDiv(conf.ui.queueCont),
+	qty = isNaN(p_qty) || p_qty == null ?
+		(parseInt(conf.ui.defQueueQty.value) > 0 ?
+		parseInt(conf.ui.defQueueQty.value) : 1) : p_qty;
+
+	let delItm = utils.mkEl('button', queueItm, null, {background:'none'}, '❌');
+	delItm.title = "Remove this item from the queue";
+	delItm.onclick = () => {queueItm.remove(); updateQueueState()}
+
+	let moveUp = utils.mkEl('button', queueItm, null, null, '⇧');
+	moveUp.title = "Move this item up in the queue";
+	moveUp.onclick = () => {
+		let prevItm = queueItm.previousSibling;
+		if(prevItm) {
+			conf.ui.queueCont.insertBefore(queueItm, prevItm);
+			updateQueueState();
+		}
+	}
+
+	let moveDown = utils.mkEl('button', queueItm, null, null, '⇩');
+	moveDown.title = "Move down in the queue";
+	moveDown.onclick = () => {
+		let nextItm = queueItm.nextSibling;
+		if(nextItm) {
+			conf.ui.queueCont.insertBefore(nextItm, queueItm);
+			updateQueueState();
+		}
+	}
+
+	let moveToBtm = utils.mkEl('button', queueItm, null, null, '⤓');
+	moveToBtm.title = "Move to the bottom of the queue";
+	moveToBtm.onclick = () => {
+		let lastItm = conf.ui.queueCont.lastChild;
+		if(lastItm.lastChild !== queueItm) {
+			conf.ui.queueCont.appendChild(queueItm);
+			updateQueueState();
+		}
+	}
+
+	let moveToTop = utils.mkEl('button', queueItm, null, null, '⤒');
+	moveToTop.title = "Move to the top of the queue";
+	moveToTop.onclick = () => {
+		let firstItm = conf.ui.queueCont.firstChild;
+		if(firstItm && firstItm !== queueItm) {
+			conf.ui.queueCont.insertBefore(queueItm, firstItm);
+			updateQueueState();
+		}
+	}
+
+	let loadItem = utils.mkEl('button', queueItm, null, null, "Load");
+	loadItem.title = "Load the settings from this item";
+	loadItem.onclick = () => loadJson(itemJSON.value);
+
+	let itemType = utils.mkEl('input', queueItm, 'AWQ-item-type');
 	itemType.title = "This is the type/tab for the queue item";
 	itemType.disabled = true;
-	let itemQuantity = document.createElement('input');
-	function updateItemQuantityBG() {
-		if(itemQuantity.value.length == 0) {itemQuantity.style.color = 'red'}
-		else if(itemQuantity.value < 1) {itemQuantity.style.color = 'rgb(0, 225, 0)'; itemQuantity.classList.add('completed-queue-item')}
-		else if(itemQuantity.value > 0) {itemQuantity.style.color = 'white'; itemQuantity.classList.remove('completed-queue-item')}
+
+	let itemQty = utils.mkEl('input', queueItm, 'AWQ-item-qty');
+	itemQty.type = 'number';
+	itemQty.title = "This is how many times this item should be executed";
+	itemQty.value = qty;
+	function updateItemQtyBG() {
+		if(itemQty.value.length == 0) itemQty.style.color = 'red';
+		else if(itemQty.value < 1) itemQty.style.color = 'rgb(0, 225, 0)', itemQty.classList.add('completed-queue-item');
+		else if(itemQty.value > 0) itemQty.style.color = 'white', itemQty.classList.remove('completed-queue-item');
 	}
-	itemQuantity.classList = 'AWQ-item-quantity';
-	itemQuantity.value = quantity;
-	itemQuantity.style.width = "50px";
-	itemQuantity.type = 'number';
-	itemQuantity.style.height = c_uiElemntHeightSmall;
-	itemQuantity.onchange = () => {
-		updateItemQuantityBG();
-		updateQueueState();
-	}
-	updateItemQuantityBG();
-	itemQuantity.onfocus = function() {this.select()}
-	itemQuantity.title = "This is how many times this item should be executed";
-	let itemJSON = document.createElement('input');
-	itemJSON.classList = 'AWQ-item-JSON';
+	itemQty.onchange = () => {updateItemQtyBG(); updateQueueState()}
+	itemQty.onfocus = () => itemQty.select();
+	updateItemQtyBG();
+
+	let itemJSON = utils.mkEl('input', queueItm, 'AWQ-item-JSON');
+	itemJSON.title = "This is a JSON string with all the settings to be used for this item. Can be changed while processing the queue but will fail if you enter invalid values.";
 	itemJSON.value = p_value || getValueJSON(p_type);
 	if(p_overwrite_data) {
 		awqLog(`appendQueueItem: Adding to queue with Overwriting: ${JSON.stringify(p_overwrite_data)}`);
 		let jsonData = JSON.parse(itemJSON.value);
-		for(let setKey in p_overwrite_data) {
-			jsonData[setKey] = p_overwrite_data[setKey];
-		}
+		for(let setKey in p_overwrite_data) jsonData[setKey] = p_overwrite_data[setKey];
 		itemJSON.value = JSON.stringify(jsonData);
 	}
-	itemJSON.style.width = "calc(100vw - 290px)";
-	itemJSON.style.height = "18px";
-	itemJSON.onchange = () => {
+	(itemJSON.onchange = () => {
 		updateQueueState();
-		// Update itemType if needed
+		//Update itemType if needed
 		let newType = itemJSON.value.match(/"type":"([^"]+)"/);
-		newType = newType ? newType[1] : null;
-		if(newType != itemType.value) itemType.value = newType;
-	}
-	itemJSON.title = "This is a JSON string with all the settings to be used for this item. Can be changed while processing the queue but will fail if you enter invalid values.";
+		itemType.value = newType ? newType[1] : null;
+	})();
 
-	let JSONType = itemJSON.value.match(/"type":"([^"]+)"/);
-	JSONType = JSONType ? JSONType[1] : conf.commonData.activeType;
-	itemType.value = p_type || JSONType;
-
-	let removeItem = document.createElement('button');
-	removeItem.innerHTML = '❌';
-	removeItem.style.height = c_uiElemntHeight;
-	removeItem.style.background = 'none';
-	removeItem.style.cursor = "pointer";
-	removeItem.title = "Remove this item from the queue";
-	removeItem.onclick = function() {
-		this.parentNode.parentNode.removeChild(this.parentNode);
-		updateQueueState();
-		awqLogPublishMsg(`Removed queue item`);
-	}
-	let moveItemUp = document.createElement('button');
-	moveItemUp.innerHTML = '⇧';
-	moveItemUp.style.height = c_uiElemntHeight;
-	moveItemUp.style.cursor = "pointer";
-	moveItemUp.title = "Move this item up in the queue";
-	moveItemUp.onclick = function() {
-		let tar = this.parentNode;
-		if(tar.previousSibling) {
-			tar.parentNode.insertBefore(tar, tar.previousSibling);
-			awqLogPublishMsg(`Rearranged queue`);
-			updateQueueState();
-		}
-
-	}
-	let moveItemDown = document.createElement('button');
-	moveItemDown.innerHTML = '⇩';
-	moveItemDown.style.height = c_uiElemntHeight;
-	moveItemDown.style.cursor = "pointer";
-	moveItemDown.title = "Move this item down in the queue";
-	moveItemDown.onclick = function() {
-		let tar = this.parentNode;
-		if(tar.nextSibling) {
-			tar.parentNode.insertBefore(tar.nextSibling, tar);
-			awqLogPublishMsg(`Rearranged queue`);
-			updateQueueState();
-		}
-	}
-	let moveItemBottom = document.createElement('button');
-	moveItemBottom.innerHTML = '⤓';
-	moveItemBottom.style.height = c_uiElemntHeight;
-	moveItemBottom.style.cursor = "pointer";
-	moveItemBottom.title = "Move this item to the bottom of the queue";
-	moveItemBottom.onclick = function() {
-		let tar = this.parentNode;
-		if(tar.parentNode.lastChild !== tar) {
-			tar.parentNode.appendChild(tar);
-			updateQueueState();
-		}
-	}
-	let moveItemTop = document.createElement('button');
-	moveItemTop.innerHTML = '⤒';
-	moveItemTop.style.height = c_uiElemntHeight;
-	moveItemTop.style.cursor = "pointer";
-	moveItemTop.title = "Move this item to the top of the queue";
-	moveItemTop.onclick = function() {
-		let tar = this.parentNode;
-		let parentFirstChild = tar.parentNode.firstChild;
-		if(parentFirstChild && parentFirstChild !== tar) {
-			tar.parentNode.insertBefore(tar, parentFirstChild);
-			awqLogPublishMsg(`Rearranged queue`);
-			updateQueueState();
-		}
-	}
-	let loadItem = document.createElement('button');
-	loadItem.innerHTML = 'Load';
-	loadItem.style.height = c_uiElemntHeight;
-	loadItem.style.cursor = "pointer";
-	loadItem.title = "Load the settings from this item";
-	loadItem.onclick = async function() {
-		let itemRow = this.parentNode;
-		await loadJson(itemRow.querySelector('.AWQ-item-JSON').value);
-	}
-
-	queueItem.appendChild(removeItem);
-	queueItem.appendChild(moveItemUp);
-	queueItem.appendChild(moveItemDown);
-	queueItem.appendChild(moveItemBottom);
-	queueItem.appendChild(moveItemTop);
-	queueItem.appendChild(loadItem);
-	queueItem.appendChild(itemType);
-	queueItem.appendChild(itemQuantity);
-	queueItem.appendChild(itemJSON);
-
-	if(conf.ui.queueContainer.innerHTML == c_emptyQueueString) conf.ui.queueContainer.innerHTML = "";
-	conf.ui.queueContainer.appendChild(queueItem);
-
-	awqLogPublishMsg(`Added new ${itemType.value} queue item (${quantity}x)`);
+	awqLogPublishMsg(`Added new ${itemType.value} queue item (${qty}x)`);
 	//Wait with updating state while loading a predefined queue
-	if(isNaN(p_quantity)) updateQueueState();
+	if(isNaN(p_qty)) updateQueueState();
 }
 
 function saveScriptSettings() {
@@ -859,13 +756,10 @@ function saveScriptSettings() {
 	let scriptSettingsCopy = structuredClone(conf.scriptSettings);
 
 	//Delete data that does not need to be saved
-	for(let ssk in scriptSettingsCopy) {
-		for(let ssk2 in scriptSettingsCopy[ssk]) {
-			if(ssk2 != 'value') delete scriptSettingsCopy[ssk][ssk2];
-		}
-	}
+	for(let ssk in scriptSettingsCopy) for(let ssk2 in scriptSettingsCopy[ssk])
+		if(ssk2 != 'value') delete scriptSettingsCopy[ssk][ssk2];
 
-	conf.ui.defaultQueueQuantity.value = conf.scriptSettings.defaultQuantity.value; // Update beacuse this one is in two places
+	conf.ui.defQueueQty.value = conf.scriptSettings.defaultQty.value; //Update beacuse this one is in two places
 	localStorage.awqScriptSettings = JSON.stringify(scriptSettingsCopy);
 }
 
@@ -874,66 +768,25 @@ function loadScriptSettings(p_scriptSettings) {
 	awqLog('Loding saved script settings');
 
 	let savedSettings = p_scriptSettings || JSON.parse(localStorage.awqScriptSettings);
-	for(let ssk in conf.scriptSettings) {
-		if(savedSettings.hasOwnProperty(ssk)) conf.scriptSettings[ssk].value = savedSettings[ssk].value;
-	}
+	for(let ssk in conf.scriptSettings) if(savedSettings.hasOwnProperty(ssk))
+		conf.scriptSettings[ssk].value = savedSettings[ssk].value;
 }
 
-function openScriptSettingsPopup() {
-	let dialog = document.createElement('span');
-	dialog.id = 'awq-script-settings-popup';
-	dialog.className = document.querySelector('gradio-app > div').classList.contains('dark') ? 'dark' : '';
-	dialog.style.minWidth = '90%';
-	dialog.style.minHeight = '90%';
-	dialog.style.marginLeft = '5%';
-	dialog.style.marginTop = '5%';
-	dialog.style.top = 0;
-	dialog.style.position = 'fixed';
-	dialog.style.zIndex = 1000;
-	dialog.style.borderRadius = '15px';
-	dialog.style.boxShadow = '3px 3px 100px black,3px 3px 500px black, 3px 3px 25px black, inset 0 0 10px black';
-
-	let titleText = document.createElement('span');
-	titleText.innerHTML = '<b>Script settings</b> - <i>hold your mouse over an item for a description</i>';
-	titleText.style.top = '5px';
-	titleText.style.left = '10px';
-	titleText.style.position = 'absolute';
-
-	let closeButton = document.createElement('span');
-	closeButton.style.position = 'absolute';
-	closeButton.style.top = '5px';
-	closeButton.style.right = '10px';
-	closeButton.style.textShadow = '#292929 2px 3px 5px';
-	closeButton.style.cursor = 'pointer';
-	closeButton.onclick = () => {document.body.removeChild(dialog); saveScriptSettings()}
-	closeButton.innerHTML = '⛌';
-
-	let dialogBody = document.createElement('span');
-	dialogBody.style.width = '90%';
-	dialogBody.style.height = '90%';
-	dialogBody.style.marginLeft = '5%';
-	dialogBody.style.marginTop = 'max(5%,45px)';
-	dialogBody.style.top = 0;
-	dialogBody.style.position = 'absolute';
-	dialogBody.style.overflow = 'auto';
-	dialogBody.style.display = 'grid';
-	dialogBody.style.gridAutoFlow = 'row';
-	dialogBody.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
-
-	dialog.appendChild(titleText);
-	dialog.appendChild(closeButton);
-	dialog.appendChild(dialogBody);
+function openSettings() {
+	let dialog = utils.mkDiv(utils.mkDiv(document.body, 'awq-popup')),
+	hdr = utils.mkDiv(dialog, 'awq-hdr'), body = utils.mkDiv(dialog, 'awq-settings')
+	utils.mkDiv(hdr, null, null, "<b>SDAtom Settings</b> - <i>Hold your mouse over an item for a description</i>");
+	let close = utils.mkDiv(hdr, null, {float:'right', textShadow:'#292929 2px 3px 5px', cursor:'pointer'}, '⛌');
+	close.onclick = () => {dialog.parentElement.remove(); saveScriptSettings()}
 
 	//Create input for each script setting
 	for(let ssKey in conf.scriptSettings) {
-		let ssObj = conf.scriptSettings[ssKey];
-
-		let ssElem = document.createElement(ssObj.type == 'text' ? 'textarea' : 'input');
+		let ssObj = conf.scriptSettings[ssKey],
+		ssCont = utils.mkDiv(body),
+		ssElem = utils.mkEl(ssObj.type=='text'?'textarea':'input');
 		ssElem.id = 'awq-ss-' + ssKey;
 		ssElem.placeholder = ssObj.name;
 		ssElem.value = ssObj.value;
-		ssElem.style.height = ssObj.type == 'text' ? '40px' : '20px';
-		ssElem.style.marginRight = '20px';
 		ssElem.onchange = function() {
 			conf.scriptSettings[ssKey].value = ssObj.type == 'boolean' ? this.checked : this.value;
 			saveScriptSettings();
@@ -941,284 +794,186 @@ function openScriptSettingsPopup() {
 
 		if(ssObj.type == 'boolean') {
 			ssElem.type = 'checkbox';
-			ssElem.style.verticalAlign = 'middle';
 			ssElem.checked = ssObj.value;
 		} else if(ssObj.type == 'numeric') {
 			ssElem.type = 'number', ssElem.inputmode = 'numeric';
 			ssElem.onkeypress = e => {if(e.key.match(/\D/g)) e.preventDefault()}
 		}
 
-		let cbLabel = document.createElement('label');
-		cbLabel.for = ssElem.id;
-		cbLabel.innerHTML = ssObj.name;
-		cbLabel.title = ssObj.description;
-
-		let ssElemContainer = document.createElement('span');
-		ssElemContainer.appendChild(cbLabel);
+		let cbLabel = utils.mkEl('label', ssCont, null, null, ssObj.name);
+		cbLabel.for = ssElem.id, cbLabel.title = ssObj.description;
 
 		if(ssObj.description.match("http")) {
-			let helpLink = document.createElement('a');
-			helpLink.innerHTML = '❓';
+			let helpLink = utils.mkEl('a', ssCont, null, {textDecoration:'none'}, '❓');
 			helpLink.target = '_blank';
 			helpLink.href = ssObj.description;
-			helpLink.style.textDecoration = 'none';
 			ssElem.title = ssObj.name;
-			ssElemContainer.appendChild(helpLink);
 		} else {
 			ssElem.title = ssObj.description;
 		}
-
-		ssElemContainer.appendChild(ssElem);
-		dialogBody.appendChild(ssElemContainer);
+		ssCont.appendChild(ssElem);
 	}
 
-	let importExportButton = document.createElement('button');
-	importExportButton.innerHTML = "Import/export";
-	importExportButton.style.height = c_uiElemntHeight;
-	importExportButton.style.cursor = "pointer";
-	importExportButton.title = "Import or export all the data for this script (to import add previoiusly exported data to the right, to export leave it empty). Importing data will reload the page!";
-	importExportButton.onclick = exportImport;
-	let importExportData = document.createElement('input');
-	importExportData.id = 'import-export-data-input';
-	importExportData.placeholder = 'Import/export data';
-	importExportData.style.height = c_uiElemntHeightSmall;
-	importExportData.style.width = '125px';
-	importExportData.title = "Exported data will be show here, add data here to import it. Importing data will reload the page!";
-	importExportData.onfocus = function() {this.select()}
-	let importExportContainer = document.createElement('span');
-	importExportContainer.appendChild(importExportButton);
-	importExportContainer.appendChild(importExportData);
-	dialogBody.appendChild(importExportContainer);
+	let importCont = utils.mkDiv(body),
+	importBtn = utils.mkEl('button', importCont, null, null, "Import/export");
+	importBtn.title = "Import or export all the data for this script (to import add previoiusly exported data to the right, to export leave it empty). Importing data will reload the page!";
+	let importData = utils.mkEl('textarea', importCont);
+	importData.placeholder = 'Import/export data';
+	importData.title = "Exported data will be show here, add data here to import it. Importing data will reload the page!";
+	importData.onfocus = () => importData.select();
+	importBtn.onclick = () => exportImport(importData);
 
 	//Add replace in queue function GUI
-	let collectedAttributes = {};
-	let anyOption = document.createElement('option');
-	anyOption.value = c_any_value;
-	conf.currentQueue.map(el => { //Fetch all attributes and values currently in queue
-		let queueObject = JSON.parse(el.value);
-		Object.keys(queueObject).forEach(key => {
-			if(!collectedAttributes[key]) collectedAttributes[key] = {};
-			collectedAttributes[key][queueObject[key]] = '';
-		});
+	let replacer = utils.mkDiv(body),
+	repLabel = utils.mkEl('label', replacer, null, {display:'block'}, "Search and replace");
+	repLabel.title = "Search for values in the queue and replace them with something else";
+
+	//Fetch all attributes and values currently in queue
+	let foundAttrs = {}, attrOpts = [];
+	conf.currentQueue.map(el => {
+		let queueData = JSON.parse(el.value);
+		for(let key in queueData) {
+			if(!foundAttrs[key]) foundAttrs[key] = {};
+			foundAttrs[key][queueData[key]] = '';
+		}
 	});
-	let componentOptions = [];
 	gradio_config.components.forEach(el => {
-		if(el.props && el.props.choices) {
-			componentOptions.push(el.props.choices);
-		}
+		if(el.props && el.props.choices) attrOpts.push(el.props.choices);
 	});
 
-	let replaceLabel = document.createElement('label');
-	replaceLabel.innerHTML = 'Search and replace';
-	replaceLabel.style.display = 'block';
-	replaceLabel.title = 'Here you can search for values in the queue and replace them with something else';
-	let replaceAttributeSelectorLabel = document.createElement('label');
-	replaceAttributeSelectorLabel.innerHTML = 'Attribute';
-	replaceAttributeSelectorLabel.title = 'Choose the attribute to replace inside of (<ANY_VALUE> to replace in any attribute)';
-	let replaceAttributeSelector = document.createElement('input');
-	replaceAttributeSelector.setAttribute('list', 'awq-replace-attrib-dataset');
-	replaceAttributeSelector.className = 'awq-right-align-placeholder';
-	replaceAttributeSelector.placeholder = '▼';
-	replaceAttributeSelector.type = 'text';
-	replaceAttributeSelector.title = replaceAttributeSelectorLabel.title;
-	replaceAttributeSelector.onfocus = function() {this.select()}
-	let replaceAttributeSelectorDataset = document.createElement('datalist');
-	replaceAttributeSelectorDataset.id = 'awq-replace-attrib-dataset';
-	replaceAttributeSelectorDataset.appendChild(anyOption);
-	Object.keys(collectedAttributes).forEach(key => { //Add all attributes from queue
-		let attribOption = document.createElement('option');
-		attribOption.value = key;
-		replaceAttributeSelectorDataset.appendChild(attribOption);
+	utils.mkEl('label', replacer, null, null, "Attribute");
+	let repAttr = utils.mkEl('input', replacer);
+	repAttr.type = 'text', repAttr.placeholder = '▼';
+	repAttr.setAttribute('list', 'awq-rep-attrs');
+	repAttr.onfocus = () => repAttr.select();
+	let repAttrData = utils.mkEl('datalist'), anyOption = utils.mkEl('option', repAttrData);
+	repAttrData.id = 'awq-rep-attrs', anyOption.value = c_any_value;
+	for(let key in foundAttrs) utils.mkEl('option', repAttrData).value = key;
 
-	});
-	let replaceValueSelectorLabel = document.createElement('label');
-	replaceValueSelectorLabel.innerHTML = 'Old value';
-	replaceValueSelectorLabel.style.display = 'block';
-	replaceValueSelectorLabel.title = 'Find this value and replace it with the one below (<ANY_VALUE> to replace anything)';
-	let replaceValueSelector = document.createElement('input');
-	replaceValueSelector.setAttribute('list', 'awq-replace-value-dataset');
-	replaceValueSelector.className = 'awq-right-align-placeholder';
-	replaceValueSelector.placeholder = '▼';
-	replaceValueSelector.type = 'text';
-	replaceValueSelector.title = replaceValueSelectorLabel.title;
-	replaceValueSelector.onfocus = function() {this.select()}
-	let replaceValueSelectorDataset = document.createElement('datalist');
-	replaceValueSelectorDataset.id = 'awq-replace-value-dataset';
-	let replaceContainer = document.createElement('span');
-	let replaceNewValueSelectorLabel = document.createElement('label');
-	replaceNewValueSelectorLabel.innerHTML = 'New value';
-	replaceNewValueSelectorLabel.style.display = 'block';
-	let replaceNewValueSelector = document.createElement('input');
-	replaceNewValueSelector.setAttribute('list', 'awq-replace-new-value-dataset');
-	replaceNewValueSelector.className = 'awq-right-align-placeholder';
-	replaceNewValueSelector.placeholder = '▼';
-	replaceNewValueSelector.type = 'text';
-	replaceNewValueSelector.title = 'The value to replace with';
-	replaceNewValueSelector.onfocus = function() {this.select()}
-	let replaceNewValueSelectorDataset = document.createElement('datalist');
-	replaceNewValueSelectorDataset.id = 'awq-replace-new-value-dataset';
+	utils.mkEl('label', replacer, null, null, "Old value");
+	let repVal = utils.mkEl('input', replacer);
+	repVal.type = 'text', repVal.placeholder = '▼';
+	repVal.setAttribute('list', 'awq-rep-vals');
+	repVal.onfocus = () => repVal.select();
+	let repValData = utils.mkEl('datalist');
+	repValData.id = 'awq-rep-vals';
 
-	let replaceButton = document.createElement('button');
-	replaceButton.innerHTML = "Replace";
-
-	replaceContainer.appendChild(replaceLabel);
-	replaceContainer.appendChild(replaceAttributeSelectorLabel);
-	replaceContainer.appendChild(replaceAttributeSelector);
-	replaceContainer.appendChild(replaceAttributeSelectorDataset);
-	replaceContainer.appendChild(replaceValueSelectorLabel);
-	replaceContainer.appendChild(replaceValueSelector);
-	replaceContainer.appendChild(replaceValueSelectorDataset);
-	replaceContainer.appendChild(replaceNewValueSelectorLabel);
-	replaceContainer.appendChild(replaceNewValueSelector);
-	replaceContainer.appendChild(replaceNewValueSelectorDataset);
-	replaceContainer.appendChild(replaceButton);
-	dialogBody.appendChild(replaceContainer);
-
-	function updateReplaceValueSelectorDataset() {
-		let foundValues = collectedAttributes[replaceAttributeSelector.value];
-		replaceValueSelectorDataset.innerHTML = '';
-		replaceValueSelectorDataset.appendChild(anyOption.cloneNode());
+	//Update repValData
+	(repAttr.onchange = repVal.onchange = () => {
+		let foundValues = foundAttrs[repAttr.value];
+		repValData.innerHTML = '';
+		repValData.appendChild(anyOption.cloneNode());
 		if(foundValues) {
-			replaceValueSelectorDataset.innerHTML = '';
-			replaceValueSelectorDataset.appendChild(anyOption.cloneNode());
-			Object.keys(foundValues).forEach(key => { //Add all possible values for currently selected attribute
-				let valueOption = document.createElement('option');
-				valueOption.value = key;
-				replaceValueSelectorDataset.appendChild(valueOption);
-			});
+			repValData.innerHTML = '';
+			repValData.appendChild(anyOption.cloneNode());
+			//Add all possible values for currently selected attribute
+			for(let key in foundAttrs) utils.mkEl('option', repValData).value = key;
 		} else {
-			Object.keys(collectedAttributes).forEach(key => {
-				let attrib = collectedAttributes[key];
-				Object.keys(attrib).forEach(innerKey => {
-					let valueOption = document.createElement('option');
-					valueOption.value = innerKey;
-					replaceValueSelectorDataset.appendChild(valueOption);
-				});
-			});
+			for(let key in foundAttrs) for(let subKey in foundAttrs[key])
+				utils.mkEl('option', repValData).value = subKey;
 		}
-	}
-	function updateReplaceNewValueSelectorDataset() {
-		let matchingValues = [];
-		//Any components that has the option we are trying to replace?
-		componentOptions.forEach(arr => {if(arr.includes(replaceValueSelector.value)) matchingValues.push(arr)});
+	})();
 
-		//If not add all their options
-		if(matchingValues.length == 0) {
-			matchingValues = [...componentOptions];
-		}
+	utils.mkEl('label', replacer, null, null, "Old value");
+	let repNewVal = utils.mkEl('input', replacer);
+	repNewVal.type = 'text', repNewVal.placeholder = '▼';
+	repNewVal.setAttribute('list', 'awq-rep-newvals');
+	repNewVal.onfocus = () => repNewVal.select();
+	let repNewValData = utils.mkEl('datalist');
+	repNewValData.id = 'awq-rep-newvals';
 
-		//Remove duplicates and replace dataset options
-		replaceNewValueSelectorDataset.innerHTML = '';
-		[...new Set(matchingValues.flat())].forEach(el => {
-			let valueOption = document.createElement('option');
-			valueOption.value = el;
-			replaceNewValueSelectorDataset.appendChild(valueOption);
-		});
-	}
-	updateReplaceNewValueSelectorDataset();
+	//Update repNewValData
+	let matchVals = [];
+	//Any components that has the option we are trying to replace?
+	attrOpts.forEach(arr => {if(arr.includes(repVal.value)) matchVals.push(arr)});
+	//If not add all their options
+	if(matchVals.length == 0) matchVals = [...attrOpts];
+	//Remove duplicates and replace dataset options
+	repNewValData.innerHTML = '';
+	[...new Set(matchVals.flat())].forEach(el => {utils.mkEl('option', repNewValData).value = el});
 
-	replaceAttributeSelector.onchange = updateReplaceValueSelectorDataset;
-	replaceValueSelector.onchange = updateReplaceValueSelectorDataset;
-	updateReplaceValueSelectorDataset();
+	let repBtn = utils.mkEl('button', replacer, null, null, "Replace");
+	repBtn.onclick = () => {
+		let attributeValue = repAttr.value,
+		anyAttribute = attributeValue == c_any_value,
+		oldValue = repVal.value,
+		anyOldValue = oldValue == c_any_value,
+		currentQueue = conf.currentQueue,
+		newValue = repNewVal.value;
 
-	//Handle clicking the search and replace button
-	replaceButton.onclick = () => {
-		let attributeValue = replaceAttributeSelector.value
-		let anyAttribute = attributeValue == c_any_value;
-		let oldValue = replaceValueSelector.value;
-		let anyOldValue = oldValue == c_any_value;
-		let currentQueue = conf.currentQueue;
-		let newValue = replaceNewValueSelector.value;
-
-		Object.keys(currentQueue).forEach(key => { //Loop queue entries
+		for(let key in currentQueue) { //Loop queue entries
 			let queueElentry = JSON.parse(currentQueue[key].value);
 			if(anyAttribute) {
-				Object.keys(queueElentry).forEach(keyInner => { //Loop queue entry attributes
+				for(let subKey in queueElentry) { //Loop queue entry attributes
 					if(anyOldValue) {
 						//Replace everything with the new value (why are you doing this?)
-						if(newValue != queueElentry[keyInner]) awqLog(`replaceButton: updated queue item ${key} attribute ${keyInner} to ${newValue}`);
-						queueElentry[keyInner] = newValue;
+						if(newValue != queueElentry[subKey]) awqLog(`replaceButton: updated queue item ${key} attribute ${subKey} to ${newValue}`);
+						queueElentry[subKey] = newValue;
 					} else {
 						//Search and replace in all attributes
-						let replacedValue = queueElentry[keyInner].replaceAll ? queueElentry[keyInner].replaceAll(oldValue, newValue) : queueElentry[keyInner];
-						if(replacedValue != queueElentry[keyInner]) awqLog(`replaceButton: updated queue item ${key} attribute ${keyInner} to ${replacedValue}`);
-						queueElentry[keyInner] = replacedValue;
+						let replacedValue = queueElentry[subKey].replaceAll ? queueElentry[subKey].replaceAll(oldValue, newValue) : queueElentry[subKey];
+						if(replacedValue != queueElentry[subKey]) awqLog(`replaceButton: updated queue item ${key} attribute ${subKey} to ${replacedValue}`);
+						queueElentry[subKey] = replacedValue;
 					}
-				});
-			} else {
-				if(anyOldValue) {
-					//Replace all values for this attribute
-					if(newValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
-					queueElentry[attributeValue] = newValue;
-				} else {
-					//Replace string in specific attribute
-					let replacedValue = queueElentry[attributeValue].replaceAll(oldValue, newValue);
-					if(replacedValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
-					queueElentry[attributeValue] = replacedValue;
 				}
+			} else if(anyOldValue) {
+				//Replace all values for this attribute
+				if(newValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
+				queueElentry[attributeValue] = newValue;
+			} else {
+				//Replace string in specific attribute
+				let replacedValue = queueElentry[attributeValue].replaceAll(oldValue, newValue);
+				if(replacedValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
+				queueElentry[attributeValue] = replacedValue;
 			}
 			currentQueue[key].value = JSON.stringify(queueElentry);
-		});
+		}
 
-		let queueElems = conf.ui.queueContainer.querySelectorAll('.AWQ-item-JSON');
 		//Update state
+		let queueElems = conf.ui.queueCont.querySelectorAll('.AWQ-item-JSON');
 		for(let i = 0; i < currentQueue.length; ++i) queueElems[i].value = currentQueue[i].value;
 		updateQueueState();
 	}
 
-	document.body.appendChild(dialog);
-
-	//Customize behaviour of the opacity button to show immediate effect
-	let opacityButton = document.getElementById('awq-ss-buttonOpacity');
-	opacityButton.type = 'range';
-	opacityButton.min = 0;
-	opacityButton.max = 1;
-	opacityButton.step = 0.1;
-	opacityButton.onchange = () => {
-		document.querySelectorAll('.awq-hover-button').forEach(elem => {
-			conf.scriptSettings.buttonOpacity.value = opacityButton.value;
-			elem.style.opacity = conf.scriptSettings.buttonOpacity.value;
-		});
-	}
+	//Custom code for opacity button
+	let opacityBtn = body.querySelector('#awq-ss-buttonOpacity');
+	opacityBtn.type = 'range';
+	opacityBtn.min = 0, opacityBtn.max = 1, opacityBtn.step = .1;
+	opacityBtn.onchange = () => {document.querySelector('.AWQ-overlay').style.opacity =
+		conf.scriptSettings.buttonOpacity.value = opacityBtn.value}
 }
 
 function toggleProcessButton(p_set_processing) {
 	let oldState = conf.commonData.processing;
 	if(p_set_processing == null) p_set_processing = !oldState;
 	else if(p_set_processing == oldState || conf.scriptSettings.stayReady.value) return;
-	awqLog('toggleProcessButton:' + p_set_processing);
-
-	let pb = conf.ui.processButton;
+	awqLog(`toggleProcessButton:${p_set_processing}`);
+	let pb = conf.ui.processBtn;
 	if(p_set_processing) {
 		awqLogPublishMsg('Processing <b>started</b>');
 		conf.commonData.processing = true;
-		pb.style.background = 'green';
-		pb.innerHTML = '⏸︎ ';
-		let cogElem = document.createElement('div')
-		cogElem.innerHTML = '⚙️';
-		cogElem.style.display = 'inline-block';
-		pb.appendChild(cogElem);
+		pb.style.background = 'green', pb.innerHTML = '⏸︎ ';
+		utils.mkDiv(pb, null, {display:'inline-block'}, '⚙️');
 		executeAllNewTasks();
 	} else {
 		awqLogPublishMsg('Processing <b>ended</b>');
 		conf.commonData.processing = conf.commonData.working = false;
-		conf.commonData.previousTaskStartTime = null;
-		pb.style.background = null;
+		conf.commonData.previousTaskStartTime = pb.style.background = null;
 		pb.innerHTML = c_processButtonText;
 	}
 }
 
 function updateQueueState() {
-	let queueItems = conf.ui.queueContainer.getElementsByTagName('div');
-	awqLog('updateQueueState: old length:' + conf.currentQueue.length + ' new length:' + queueItems.length);
+	let queue = conf.ui.queueCont.getElementsByTagName('div');
+	awqLog('updateQueueState: old length:' + conf.currentQueue.length + ' new length:' + queue.length);
 
 	let newArray = [];
-	for(let i = 0; i < queueItems.length; ++i) {
+	for(let i = 0; i < queue.length; ++i) {
 		let newRowObject = {};
 		newRowObject.rowid = i;
-		newRowObject.type = queueItems[i].querySelector('.AWQ-item-type').value;
-		newRowObject.quantity = queueItems[i].querySelector('.AWQ-item-quantity').value;
-		newRowObject.value = queueItems[i].querySelector('.AWQ-item-JSON').value;
+		newRowObject.type = queue[i].querySelector('.AWQ-item-type').value;
+		newRowObject.qty = queue[i].querySelector('.AWQ-item-qty').value;
+		newRowObject.value = queue[i].querySelector('.AWQ-item-JSON').value;
 		newArray.push(newRowObject);
 	}
 	conf.currentQueue = newArray;
@@ -1244,7 +999,7 @@ function updateStatus() {
 
 	if(newType !== previousType) {
 		awqLog('updateStatus: active type changed to: ' + newType);
-		conf.ui.container.style.display = newType === 'other' ? 'none' : '';
+		conf.ui.overlay.style.display = conf.ui.msgBox.style.display = newType === 'other' ? 'none' : '';
 	}
 
 	if(conf.commonData.processing && !conf.commonData.working && !conf.commonData.previousTaskStartTime)
@@ -1271,27 +1026,27 @@ async function executeAllNewTasks() {
 			awqLogPublishMsg(`Completed work on queue item after ${Math.floor(timeSpent / 1000 / 60)} minutes ${Math.round((timeSpent - Math.floor(timeSpent / 60000) * 60000) / 1000)} seconds`);
 		}
 
-		let queueItems = conf.ui.queueContainer.getElementsByTagName('div');
-		for(let i = 0; i < queueItems.length; ++i) {
-			let itemQuantity = queueItems[i].querySelector('.AWQ-item-quantity');
-			let itemType = queueItems[i].querySelector('.AWQ-item-type').value;
-			if(itemQuantity.value > 0) {
-				awqLog('executeNewTask: found next work item with index ' + i + ', quantity ' + itemQuantity.value + ' and type ' + itemType);
+		let queue = conf.ui.queueCont.getElementsByTagName('div');
+		for(let i = 0; i < queue.length; ++i) {
+			let itemQty = queue[i].querySelector('.AWQ-item-qty'),
+			itemType = queue[i].querySelector('.AWQ-item-type').value;
+			if(itemQty.value > 0) {
+				awqLog(`executeNewTask: found next work item with index ${i}, qty ${itemQty.value} and type ${itemType}`);
 				conf.commonData.working = true;
-				await loadJson(queueItems[i].querySelector('.AWQ-item-JSON').value);
+				await loadJson(queue[i].querySelector('.AWQ-item-JSON').value);
 				await clickStartButton(itemType);
-				itemQuantity.value = itemQuantity.value - 1;
-				itemQuantity.onchange();
-				awqLogPublishMsg(`Started working on ${itemType} queue item ${i + 1} (${itemQuantity.value} more to go) `);
+				itemQty.value = itemQty.value - 1;
+				itemQty.onchange();
+				awqLogPublishMsg(`Started working on ${itemType} queue item ${i + 1} (${itemQty.value} more to go) `);
 				conf.commonData.previousTaskStartTime = Date.now();
 				await waitForTaskToComplete(itemType);
-				queueItems = true;
+				queue = true;
 				break;
 			}
 		}
 
 		//No more tasks to process
-		if(queueItems !== true) {
+		if(queue !== true) {
 			if(conf.commonData.previousTaskStartTime) {
 				conf.commonData.previousTaskStartTime = null;
 				awqLog('executeNewTask: No more tasks found');
@@ -1306,112 +1061,77 @@ async function executeAllNewTasks() {
 function playWorkCompleteSound() {if(conf.scriptSettings.notificationSound.value) c_audio_base64.play()}
 
 function editSetting() {
-	let settingStorage = conf.ui.settingsStorage;
-	let settingIndex = settingStorage.selectedIndex;
-	let settingOption = settingStorage.options[settingIndex];
-	let settingKey = settingOption.innerHTML;
-	if(settingKey == c_defaultTextStoredSettings) return;
-	awqLog('editSettings: index' + settingIndex);
+	let setStore = conf.ui.settingsStorage, setIdx = setStore.selectedIndex,
+	setOpt = setStore.options[setIdx], setKey = setOpt.innerHTML;
+	if(setKey == c_defaultTextStoredSettings) return;
+	awqLog('editSettings: index' + setIdx);
 
-	let editContainer = document.createElement('div');
-	editContainer.style.cssText = 'position: fixed;bottom: 0;left: 0;width: 100vw;height: 100vh;background:black;z-index: 9999;';
-	let txtInput = document.createElement('input');
-	txtInput.style.cssText = 'width: 100vw;height: 10vh;';
-	txtInput.title = "Name of the settins set (do not remove the prefix)";
-	editContainer.appendChild(txtInput);
-	let txtArea = document.createElement('textarea');
-	txtArea.style.cssText = 'width: 100vw;height: 80vh;';
-	txtArea.title = 'The set of settings i JSON format (Edit the value inside the "" but leave structure intact, an entire propertey: "id":"value" can also be removed if you do not want this setting set to make any changes to that setting)';
-	editContainer.appendChild(txtArea);
-	let editButton = document.createElement('button');
-	editButton.style.cssText = 'width: 50vw;height: 10vh;';
-	editButton.innerHTML = 'OK';
-	editButton.title = "Save changes";
-	editContainer.appendChild(editButton);
-	let resetButton = document.createElement('button');
-	resetButton.style.cssText = 'width: 50vw;height: 10vh;';
-	resetButton.innerHTML = 'Reset';
-	resetButton.title = "Revert changes";
-	resetButton.onclick = () => {
-		txtArea.value = conf.ui.settingsStorage.options[settingIndex].value;
-		txtInput.value = conf.ui.settingsStorage.options[settingIndex].text;
-	}
-	editContainer.appendChild(resetButton);
-
-	resetButton.onclick();
-
+	//TODO Add to stylesheet instead of fixed style
 	document.body.style.overflow = 'hidden';
-	document.body.appendChild(editContainer);
+	let editCont = utils.mkDiv(document.body, null, {position:'fixed', left:0,
+		bottom:0, width:'100vw', height:'100vh', background:'#000', zIndex:9999});
 
-	editButton.onclick = () => {
+	let txtInput = utils.mkEl('input', editCont, null, {width:'100vw', height:'10vh'});
+	txtInput.title = "Name of the settins set (do not remove the prefix)";
+
+	let txtArea = utils.mkEl('textarea', editCont, null, {width:'100vw', height:'80vh'});
+	txtArea.title = `The set of settings i JSON format (Edit the value inside the "" but leave structure intact, an entire propertey: "id":"value" can also be removed if you do not want this setting set to make any changes to that setting)`;
+
+	let editBtn = utils.mkEl('button', editCont, null, {width:'50vw', height:'10vh'}, "OK");
+	editBtn.title = "Save changes";
+	editBtn.onclick = () => {
 		//Validate
-		if(txtInput.value.length < 1) {
-			alert('Name is missing');
-			return;
-		}
-		if(!isJsonString(txtArea.value)) {
-			alert('Value is invalid JSON');
-			return;
-		}
-		if(!['t2i-', 'i2i-', 'ext-'].includes(txtInput.value.substr(0, 4))) {
-			alert('Name does not have valid prefix (t2i-, i2i-, ext-)');
-			return;
-		}
+		if(txtInput.value.length < 1) return alert('Name is missing');
+		if(!isJsonString(txtArea.value)) return alert('Value is invalid JSON');
+		if(!['t2i-', 'i2i-', 'ext-'].includes(txtInput.value.slice(0, 4)))
+			return alert('Name does not have valid prefix (t2i-, i2i-, ext-)');
 
 		//Remove overlay
-		document.body.style.overflow = 'scroll';
-		document.body.removeChild(editContainer);
+		document.body.style.overflow = '';
+		editCont.remove();
 
 		//Update data and refresh UI
-		awqLog('editSettings: updating ' + settingKey + (settingKey == txtInput.value ? '' : ' to ' + txtInput.value));
-		delete conf.savedSetting[settingKey];
+		awqLog(`editSettings: updating ${setKey} ${setKey==txtInput.value?'':' to '+txtInput.value}`);
+		delete conf.savedSetting[setKey];
 		conf.savedSetting[txtInput.value] = txtArea.value;
 		localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
 		refreshSettings();
 
 		//Select option again
-		let optionToSelect = Array.from(settingStorage.options).find(item => item.text === txtInput.value);
-		optionToSelect.selected = true;
+		let opt = Array.from(setStore.options).find(item => item.text === txtInput.value);
+		opt.selected = true;
 	}
+
+	let rstBtn = utils.mkEl('button', editCont, null, {width:'50vw', height:'10vh'}, "Reset");
+	rstBtn.title = "Revert changes";
+	(rstBtn.onclick = () => {
+		txtArea.value = conf.ui.settingsStorage.options[setIdx].value;
+		txtInput.value = conf.ui.settingsStorage.options[setIdx].text;
+	})();
 }
 
 function saveSettings() {
 	if(conf.ui.settingName.value.length < 1) return alert('Missing name');
 	if(conf.savedSetting.hasOwnProperty(conf.ui.settingName.value)) return alert('Duplicate name');
-
 	let settingSetName = conf.commonData.activeType + '-' + conf.ui.settingName.value;
 	conf.savedSetting[settingSetName] = getValueJSON();
-
 	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-
 	awqLogPublishMsg(`Saved new setting set ` + settingSetName);
 	refreshSettings();
 }
 function refreshSettings() {
 	awqLog('refreshSettings: saved settings:' + Object.keys(conf.savedSetting).length);
-	conf.ui.settingName.value = "";
-	conf.ui.settingsStorage.innerHTML = "";
-
-	for(let prop in conf.savedSetting) {
-		let newOption = document.createElement('option');
-		newOption.innerHTML = prop;
-		newOption.value = conf.savedSetting[prop]
-		conf.ui.settingsStorage.appendChild(newOption);
-	}
-	if(Object.keys(conf.savedSetting).length < 1) {
-		let blankOption = document.createElement('option');
-		blankOption.innerHTML = c_defaultTextStoredSettings;
-		blankOption.value = "";
-		conf.ui.settingsStorage.appendChild(blankOption);
-	}
+	conf.ui.settingName.value = conf.ui.settingsStorage.innerHTML = "";
+	for(let prop in conf.savedSetting) utils.mkEl('option',
+		conf.ui.settingsStorage, null, null, prop).value = conf.savedSetting[prop];
+	if(Object.keys(conf.savedSetting).length < 1) utils.mkEl('option',
+		conf.ui.settingsStorage, null, null, c_defaultTextStoredSettings).value = "";
 }
 async function loadSetting() {
-
 	if(conf.ui.settingsStorage.value.length < 1) return;
 	let itemName = conf.ui.settingsStorage.options[conf.ui.settingsStorage.selectedIndex].text;
 	let itemType = itemName.split('-')[0];
 	awqLog('loadSetting: ' + itemName);
-
 	await loadJson(conf.ui.settingsStorage.value);
 }
 function clearSetting() {
@@ -1419,11 +1139,9 @@ function clearSetting() {
 	if(ss.value.length < 1) return;
 	awqLogPublishMsg(`Removed setting ` + ss.options[ss.selectedIndex].innerHTML);
 	delete conf.savedSetting[ss.options[ss.selectedIndex].innerHTML];
-	ss.removeChild(ss.options[ss.selectedIndex]);
-
+	ss.options[ss.selectedIndex].remove();
 	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
 	if(ss.value.length < 1) refreshSettings();
-
 }
 
 function clickStartButton(p_type) {
@@ -1453,9 +1171,7 @@ function clickStartButton(p_type) {
 function switchTabAndWait(p_type) {
 	if(p_type == conf.commonData.activeType) return;
 	awqLog('switchTabAndWait: ' + p_type);
-
 	conf.shadowDOM.root.querySelector(conf[p_type].controls.tabButton.sel).click(); //Using .el doesn't work
-
 	conf.commonData.waiting = true;
 	return new Promise(resolve => {
 		let startingTab = conf.commonData.activeType;
@@ -1471,16 +1187,12 @@ function switchTabAndWait(p_type) {
 
 function switchTabAndWaitUntilSwitched(p_targetTabName, p_tabConfig) {
 	awqLog('switchTabAndWaitUntilSwitched: p_target=' + p_targetTabName + ' p_config=' + p_tabConfig);
-
 	let targetTabConf = p_tabConfig.filter((elem) => {return elem.name == p_targetTabName})[0];
 	function correctTabVisible() {
 		return conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display != 'none';
 	}
-
 	if(correctTabVisible()) return;
-
 	conf.shadowDOM.root.querySelector(targetTabConf.buttonSel).click();
-
 	conf.commonData.waiting = true;
 	return new Promise(resolve => {
 		let waitForSwitchInterval = setInterval(() => {
@@ -1500,13 +1212,9 @@ function forceGradioUIUpdate() {
 }
 
 function webUICurrentyWorkingOn(p_itemType) {
-	if(p_itemType == 'i2i') {
-		return conf.i2i.controls.skipButton.el.getAttribute('style') == 'display: block;';
-	} else if(p_itemType == 't2i') {
-		return conf.t2i.controls.skipButton.el.getAttribute('style') == 'display: block;';
-	} else {
-		return conf.ext.controls.loadingElement.el.innerHTML.length > 0;
-	}
+	if(p_itemType == 'i2i' || p_itemType == 't2i')
+		return conf[p_itemType].controls.skipButton.el.getAttribute('style') == 'display: block;';
+	return conf.ext.controls.loadingElement.el.innerHTML.length > 0;
 }
 
 function waitForTaskToComplete(p_itemType) {
@@ -1535,7 +1243,6 @@ function filterPrompt(p_prompt_text, p_neg) {
 
 		let regEx = new RegExp(promptFilter[i].pattern, promptFilter[i].flags);
 		let tmpNewPromptText = newPromptText.replace(regEx, promptFilter[i].replace);
-
 		if(tmpNewPromptText !== newPromptText) {
 			let changesCount = levenshteinDist(newPromptText, tmpNewPromptText);
 			awqLogPublishMsg(`Filtered ${p_neg ? '(neg)' : ''}prompt with filter (${promptFilter[i].desc}), ${changesCount} char changes`);
@@ -1546,38 +1253,30 @@ function filterPrompt(p_prompt_text, p_neg) {
 	return newPromptText;
 }
 
-function exportImport() {
+function exportImport(input) {
 	let exportJSON = JSON.stringify({
 		savedSetting: conf.savedSetting,
 		currentQueue: conf.currentQueue,
-		scriptSettings: JSON.parse(localStorage.awqScriptSettings), //Use localstorage since it has filtered everything except values
+		scriptSettings: JSON.parse(localStorage.awqScriptSettings) //Use localstorage since it has filtered everything except values
 	});
-	let exportImportInput = document.getElementById('import-export-data-input');
-	let importJSON = exportImportInput.value;
-
+	let importJSON = input.value;
 	if(importJSON.length < 1) {
 		awqLogPublishMsg(`Exported script data`);
-		exportImportInput.value = exportJSON;
-		exportImportInput.focus();
-		exportImportInput.select();
+		input.value = exportJSON;
+		input.focus(), input.select();
 		return;
 	}
-	if(!isJsonString(importJSON)) {
-		alert(`There is something wrong with the import data provided`);
-		return;
-	} else if(exportJSON == importJSON) {
-		alert(`The input data is the same as the current script data`);
-	} else {
-		awqLog('Data has changed');
-		let parsedImportJSON = JSON.parse(importJSON);
-		conf.savedSetting = parsedImportJSON.savedSetting;
-		conf.currentQueue = parsedImportJSON.currentQueue;
-		loadScriptSettings(parsedImportJSON.scriptSettings); //Load with loadScriptSettings to only replace values
-		localStorage.awqScriptSettings = JSON.stringify(parsedImportJSON.scriptSettings);
-		localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-		localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
-		location.reload();
-	}
+	if(!isJsonString(importJSON)) return alert(`There is something wrong with the import data provided`);
+	if(exportJSON == importJSON) return alert(`The input data is the same as the current script data`);
+	awqLog('Data has changed');
+	let parsedImportJSON = JSON.parse(importJSON);
+	conf.savedSetting = parsedImportJSON.savedSetting;
+	conf.currentQueue = parsedImportJSON.currentQueue;
+	loadScriptSettings(parsedImportJSON.scriptSettings); //Load with loadScriptSettings to only replace values
+	localStorage.awqScriptSettings = JSON.stringify(parsedImportJSON.scriptSettings);
+	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
+	localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
+	location.reload();
 }
 function isJsonString(str) {
 	try {JSON.parse(str)} catch(e) {return false}
@@ -1591,12 +1290,10 @@ function getCallStack() {
 function levenshteinDist(s1, s2) {
 	if(s1 === s2) return 0;
 	else {
-		var s1_len = s1.length, s2_len = s2.length;
+		let s1_len = s1.length, s2_len = s2.length;
 		if(s1_len && s2_len) {
-			var i1 = 0, i2 = 0, a, b, c, c2, row = [];
-			while(i1 < s1_len) {
-				row[i1] = ++i1;
-			}
+			let i1 = 0, i2 = 0, a, b, c, c2, row = [];
+			while(i1 < s1_len) row[i1] = ++i1;
 			while(i2 < s2_len) {
 				c2 = s2.charCodeAt(i2);
 				a = i2;
