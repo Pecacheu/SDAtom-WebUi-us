@@ -238,7 +238,7 @@ let conf = {
 			},
 			functions: {
 				getValueJSON: () => {
-					awqLog('iBrowser.getValueJSON: parsing data');
+					awqDebug('iBrowser.getValueJSON: parsing data');
 					let valueJSON = {type: 't2i'},
 					currentTab = document.querySelector('#image_browser_tabs_container button.selected').innerHTML;
 					currentTab = currentTab.replace(/\s/g, '');
@@ -323,7 +323,7 @@ let conf = {
 	},
 	ui: {},
 	scriptSettings: {
-		defaultQty: {name: "Default queue quantity", description: "Default number of times to execute each queue item", type: "numeric", value: 1},
+		defQty: {name: "Default queue quantity", description: "Default number of times to execute each queue item", type: "numeric", value: 1},
 		rememberQueue: {name: "Remember queue", description: "Remember the queue if you reload the page", type: "boolean", value: true},
 		stayReady: {name: "Stay ready", description: "Remain ready after end-of-queue until manually stopped", type: "boolean", value: false},
 		notificationSound: {name: "Notification sound", description: "Sound to be played when processing of queue items stops", type: "boolean", value: true},
@@ -343,7 +343,7 @@ let conf = {
 }
 
 if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnProperty("awqScriptSettings")) { //Tmp settings migration
-	awqLog('Copying settings from old storage');
+	awqDebug('Copying settings from old storage');
 	if(localStorage.hasOwnProperty("awqNotificationSound"))
 		conf.scriptSettings.notificationSound.value = localStorage.awqNotificationSound == 1;
 	if(localStorage.hasOwnProperty("awqAutoscrollOutput"))
@@ -358,58 +358,28 @@ if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnPr
 		conf.scriptSettings.extensionScript.value = localStorage.awqExtensionScript;
 }
 
-const c_emptyQueueString = 'Queue is empty',
-c_addQueueText = 'Add to queue',
+const c_wait_tick_duration = 200,
+c_any_value = "<ANY VALUE>",
+c_emptyQueueString = "Queue is empty",
+c_addQueueText = "Add to queue",
 c_addQueueDesc = "Add an item to the queue according to current tab and settings",
 c_addQueueDescAlt = c_addQueueDesc+" and overwrite with Alt ",
 c_processButtonText = "Process Queue",
 c_defaultTextStoredSettings = "Stored settings",
 c_audio_base64 = new Audio('data:audio/mpeg;base64,//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVR9DU02wxI2HBY0xzzTPHVjsaEggIYbBQymbZ5et+lSLLDAPL2LcegkDNlkiLYgIBgMoIRxodnFVNMu2pmYwSfDSC2CxTFDKowcoycCimGKGFhYRCx50EjDS05dCEXJaIRTRHMTQfkO/U/sjuSEa5wroVM0a2hmXr0oA7JasD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V///+YGDIYDB4HGBRAYjCABAQMAOrVXeNb/////QYBwSBIETHQhBgBRAMGgq1lV3jW13f//////ogl+UTWeJbqBIMiQBa6X2STL/Y1tdq75lrtXf///////44AURAYAVhE+lMmFrcRNYQqJhyhq4FhWjY1tdx/mWu475lrv//////////rTVMnql4XBZApWX+aWuRL1jSmZf5pbEEvXQWDS+Z+yzHfK2u1d8y12rtFKTRUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAOAAAAAAA0gBwAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
 
-const c_defaultOtputConsoleText = "Here you will see some information about what the script is doing",
-c_defaultOtputConsoleTextHTML = `<span class="console-description" style="color:darkgray">${c_defaultOtputConsoleText}</span>`,
-c_wait_tick_duration = 200,
-c_any_value = '<ANY VALUE>';
-
 //----------------------------------------------------------------------------- Logging
-function preAwqLog(p_message) {console.log(`SDAtom-WebUi-us: ${p_message}`)}
-preAwqLog(`Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${navigator.userAgent}`);
-
-function awqLog(p_message) {
-	if(conf.scriptSettings.verboseLog.value) {
-		awqLogPublishMsg(p_message, 'lightgray');
-	}
-}
-
-function awqLogPublishMsg(p_message, p_color) {
-	if(!conf.ui.msgConsole) return;
-	if(conf.ui.msgConsole.innerHTML.match('console-description'))
-		conf.ui.msgConsole.innerHTML = `* Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${navigator.userAgent} stable-diffusion-webui version <span style="font-size: 0.9em;">${conf.commonData.versionContainer.el.textContent}</span>`;
-
-	const timestamp = (new Date()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
-	utils.mkDiv(conf.ui.msgConsole, null, null, `<span style="${p_color ? 'color:' + p_color : ''}">${timestamp}: ${p_message}</span>`);
-
+function preAwqLog(msg) {console.info(`SDAtom-WebUi-us: ${msg}`)}
+function awqDebug(msg, force) {awqLog(msg, 0, 1, force)}
+function awqErr(msg) {awqLog(msg, 'red')}
+function awqLog(msg, color, isDbg, force) {
+	if(!conf.ui.msgConsole) return preAwqLog(msg);
+	if(isDbg && !(force || conf.scriptSettings.verboseLog.value)) return;
+	let ts = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+	msg = utils.mkEl(isDbg?'span':'div', conf.ui.msgConsole, null, null, `${ts}: ${msg}`);
+	if(color) msg.style.color = color;
 	if(conf.ui.msgConsole.childElementCount >= conf.scriptSettings.maxOutputLines.value) conf.ui.msgConsole.firstChild.remove();
 	if(conf.scriptSettings.autoscrollOutput.value) conf.ui.msgConsole.scrollTo(0, conf.ui.msgConsole.scrollHeight);
-}
-
-function awqLogPublishError(p_message) {awqLogPublishMsg(p_message, 'red')}
-addEventListener("error", (event) => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg(`Javascript error (can be caused by something other than this script): ${event.message} source:${event.filename} line:${event.lineno} col:${event.colno} Error:${event.error ? JSON.stringify(event.error) : ''}`, 'darkorange');
-}, true);
-addEventListener("unhandledrejection", (event) => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg(`Javascript promise error (can be caused by something other than this script): ${event.reason}`, 'darkorange');
-}, true);
-
-let oldWarn = console.warn, oldInfo = console.info, oldLog = console.log, oldError = console.error;
-console.warn = p_msg => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (warn) message (can be caused by something other than this script):' + p_msg + `<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldWarn(p_msg);
-}
-console.info = p_msg => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (info) message (can be caused by something other than this script):' + p_msg + `<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldInfo(p_msg);
-}
-console.log = p_msg => {
-	if(conf.scriptSettings.verboseLog.value) awqLogPublishMsg('log (log) message (can be caused by something other than this script):' + p_msg + `<br>Call stack:<pre>${getCallStack()}</pre>`, 'lightgray'); oldLog(p_msg);
 }
 
 //----------------------------------------------------------------------------- Wait for content to load
@@ -444,7 +414,8 @@ function initAWQ() {
 	loadScriptSettings();
 	generateMainUI();
 
-	try {eval(conf.scriptSettings.extensionScript.value)} catch(e) {awqLogPublishMsg(`Failed to load extension script, error: <pre>${e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
+	try {eval(conf.scriptSettings.extensionScript.value)} catch(e) {awqLog(`Failed to load extension script, error: <pre>${
+		e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
 
 	setInterval(updateStatus, c_wait_tick_duration);
 }
@@ -453,20 +424,20 @@ function mapElementsToConf(p_object, p_info) {
 	for(let prop in p_object) {
 		if(p_object[prop].sel) {
 			p_object[prop].el = conf.shadowDOM.root.querySelector(p_object[prop].sel);
-			if(!p_object[prop].el) awqLogPublishError(`Failed to find the ${p_info} ${prop}`);
+			if(!p_object[prop].el) awqErr(`Failed to find the ${p_info} ${prop}`);
 		}
 		if(p_object[prop].sel2) {
 			p_object[prop].el2 = conf.shadowDOM.root.querySelector(p_object[prop].sel2);
-			if(!p_object[prop].el2) awqLogPublishError(`Failed to find the secondary ${p_info} ${prop}`);
+			if(!p_object[prop].el2) awqErr(`Failed to find the secondary ${p_info} ${prop}`);
 		}
 		if(p_object[prop].grad) {
 			let gradIndex = p_object[prop].gradIndex ? p_object[prop].gradIndex : 0;
 			p_object[prop].gradEl = findGradioComponentState(p_object[prop].grad)[gradIndex];
-			if(!p_object[prop].gradEl) awqLogPublishError(`Failed to find the gradio element ${p_info} ${prop}`);
+			if(!p_object[prop].gradEl) awqErr(`Failed to find the gradio element ${p_info} ${prop}`);
 		}
 		if(p_object[prop].gradLab) {
 			p_object[prop].gradEl = findGradioComponentStateByLabel(p_object[prop].gradLab)[0];
-			if(!p_object[prop].gradEl) awqLogPublishError(`Failed to find the gradio element ${p_info} ${prop}`);
+			if(!p_object[prop].gradEl) awqErr(`Failed to find the gradio element ${p_info} ${prop}`);
 		}
 	}
 }
@@ -479,6 +450,7 @@ function appendQueueBtn(parent, name, onclick, tip) {
 
 function generateMainUI() {
 	utils.mkEl('style', document.head, null, null, `
+:root { color-scheme:dark; }
 .AWQ-box input, .AWQ-box input[type=number], .AWQ-box select,
 .AWQ-console > div, .awq-popup input, .awq-popup textarea {
 	height:25px; vertical-align:top;
@@ -495,13 +467,13 @@ function generateMainUI() {
 .awq-popup, .awq-popup * { box-sizing:border-box; }
 .awq-popup {
 	position:fixed; top:0; left:0; width:100%; height:100%;
-	padding:30px 5%; z-index:9999; overflow-y:auto;
-	font-family:sans-serif;
+	padding:50px 0; z-index:9999; overflow-y:auto;
+	background:rgba(0,0,0,.5); font-family:sans-serif;
 }
 .awq-popup > div {
-	width:100%; padding:20px;
+	width:100%; max-width:1200px; margin:auto; padding:20px;
 	border-radius:15px; background:var(--background-fill-primary);
-	box-shadow:3px 3px 100px black, 3px 3px 500px black, 3px 3px 25px black;
+	box-shadow:3px 3px 100px #000, 3px 3px 500px #000, 3px 3px 25px #000;
 }
 .awq-hdr {
 	display:flex; justify-content:space-between;
@@ -515,7 +487,7 @@ function generateMainUI() {
 .awq-popup input[type=checkbox] { vertical-align:middle; margin:0 5px; }
 .awq-popup button { margin:5px 0; }
 .awq-popup button:last-child { margin-bottom:0; }
-.awq-popup textarea { min-height:40px; resize:vertical; }
+.awq-popup textarea { min-height:60px; resize:vertical; }
 
 .AWQ-box button, .AWQ-overlay button, .awq-popup button {
 	display:inline-block; height:25px; cursor:pointer;
@@ -525,7 +497,8 @@ function generateMainUI() {
 	border-radius:var(--input-radius);
 	margin-right:5px; padding: 0 5px;
 }
-.AWQ-console > div { border-radius:unset; margin:0; padding:2px; }
+.AWQ-console > div { height:auto; margin:0; padding:2px; border-radius:unset; }
+.AWQ-console > span { display:block; padding:2px; color:darkgray; }
 .AWQ-box input.completed-queue-item {
 	background:var(--button-secondary-background-fill);
 	color:var(--button-secondary-text-color);
@@ -566,23 +539,23 @@ function generateMainUI() {
 
 	appendQueueBtn(overlay, c_addQueueText, appendQueueItem, c_addQueueDesc);
 	let qbCont = utils.mkDiv(overlay);
-	appendQueueBtn(qbCont, 'A1', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value))}, c_addQueueDescAlt+1);
-	appendQueueBtn(qbCont, 'A2', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings2.value))}, c_addQueueDescAlt+2);
-	appendQueueBtn(qbCont, 'A3', () => {appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value))}, c_addQueueDescAlt+3);
+	appendQueueBtn(qbCont, 'A1', () => appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value)), c_addQueueDescAlt+1);
+	appendQueueBtn(qbCont, 'A2', () => appendQueueItem(null, null, null, JSON.parse(conf.scriptSetntings.overwriteQueueSettings2.value)), c_addQueueDescAlt+2);
+	appendQueueBtn(qbCont, 'A3', () => appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value)), c_addQueueDescAlt+3);
 
-	let defQueueQty = utils.mkEl('input', msgBox, null, {width:'50px'});
-	defQueueQty.type = 'number';
-	defQueueQty.title = "How many items of each will be added to the queue (default is 1)";
-	defQueueQty.value = conf.scriptSettings.defaultQty.value;
-	defQueueQty.onchange = function() {conf.scriptSettings.defaultQty.value = this.value}
-	defQueueQty.onfocus = function() {this.select()}
-	conf.ui.defQueueQty = defQueueQty;
+	let defQty = utils.mkEl('input', msgBox, null, {width:'50px'});
+	defQty.type = 'number', defQty.min = 0;
+	defQty.title = "How many items of each will be added to the queue (default is 1)";
+	defQty.value = conf.scriptSettings.defQty.value;
+	defQty.onchange = function() {conf.scriptSettings.defQty.value = this.value}
+	defQty.onfocus = function() {this.select()}
+	conf.ui.defQty = defQty;
 
 	let assignDefVal = utils.mkEl('button', msgBox, null, null, '⤵');
 	assignDefVal.title = "Assign the default value to all queue items";
 	assignDefVal.onclick = () => {
-		if(conf.scriptSettings.defaultQty.value >= 0) {
-			document.querySelectorAll('.AWQ-item-qty').forEach((inp) => {inp.value = conf.scriptSettings.defaultQty.value});
+		if(conf.scriptSettings.defQty.value >= 0) {
+			document.querySelectorAll('.AWQ-item-qty').forEach((inp) => {inp.value = conf.scriptSettings.defQty.value});
 			updateQueueState();
 		}
 	}
@@ -600,7 +573,7 @@ function generateMainUI() {
 		let oldQueueLength = conf.currentQueue.length;
 		conf.currentQueue = [];
 		updateQueueState();
-		awqLogPublishMsg(`Queue has been cleared, ${oldQueueLength} items removed`);
+		awqLog(`Queue has been cleared, ${oldQueueLength} items removed`);
 	}
 
 	let settingsBtn = utils.mkEl('button', msgBox, null, {float:'right', margin:0}, "Settings");
@@ -636,34 +609,33 @@ function generateMainUI() {
 	saveBtn.title = "Save currently selected settings so that you can load them again later";
 	saveBtn.onclick = saveSettings;
 
-	let msgConsole = utils.mkDiv(msgBox, 'AWQ-console', null, c_defaultOtputConsoleTextHTML)
-	msgConsole.title = c_defaultOtputConsoleText;
-	conf.ui.msgConsole = msgConsole;
-
+	conf.ui.msgConsole = utils.mkDiv(msgBox, 'AWQ-console');
+	awqDebug(`* Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${
+		navigator.userAgent} <span style="font-size:.9em">WebUI ${conf.commonData.versionContainer.el.textContent}`, true);
 	let msgClearBtn = utils.mkEl('button', msgBox, null, null, "Clear");
-	msgClearBtn.title = "Clear the console above";
-	msgClearBtn.onclick = () => {conf.ui.msgConsole.innerHTML = c_defaultOtputConsoleTextHTML}
+	msgClearBtn.title = "Clear the console";
+	msgClearBtn.onclick = () => {conf.ui.msgConsole.textContent = ''}
 
 	document.querySelector('.gradio-container').style.overflow = 'visible'; //Fix so that a dropdown menu can overlap the queue
 	refreshSettings();
 
 	if(conf.currentQueue.length > 0) {
-		awqLog('Loaded saved queue:' + conf.currentQueue.length);
+		awqDebug(`Loaded saved queue:${conf.currentQueue.length}`);
 		for(let i = 0; i < conf.currentQueue.length; ++i)
 			appendQueueItem(conf.currentQueue[i].qty, conf.currentQueue[i].value, conf.currentQueue[i].type);
 		updateQueueState();
 	}
-	awqLog('generateMainUI: Completed');
+	awqDebug('generateMainUI: Completed');
 }
 
 function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
-	awqLog(`appendQueueItem: qty:${p_qty} type:${p_type}`);
+	awqDebug(`appendQueueItem: qty:${p_qty} type:${p_type}`);
 
-	if(conf.ui.queueCont.innerHTML == c_emptyQueueString) conf.ui.queueCont.innerHTML = '';
+	if(conf.ui.queueCont.innerHTML == c_emptyQueueString) conf.ui.queueCont.textContent = '';
 	let queueItm = utils.mkDiv(conf.ui.queueCont),
 	qty = isNaN(p_qty) || p_qty == null ?
-		(parseInt(conf.ui.defQueueQty.value) > 0 ?
-		parseInt(conf.ui.defQueueQty.value) : 1) : p_qty;
+		(parseInt(conf.ui.defQty.value) > 0 ?
+		parseInt(conf.ui.defQty.value) : 1) : p_qty;
 
 	let delItm = utils.mkEl('button', queueItm, null, {background:'none'}, '❌');
 	delItm.title = "Remove this item from the queue";
@@ -718,7 +690,7 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 	itemType.disabled = true;
 
 	let itemQty = utils.mkEl('input', queueItm, 'AWQ-item-qty');
-	itemQty.type = 'number';
+	itemQty.type = 'number', itemQty.min = 0;
 	itemQty.title = "This is how many times this item should be executed";
 	itemQty.value = qty;
 	function updateItemQtyBG() {
@@ -734,7 +706,7 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 	itemJSON.title = "This is a JSON string with all the settings to be used for this item. Can be changed while processing the queue but will fail if you enter invalid values.";
 	itemJSON.value = p_value || getValueJSON(p_type);
 	if(p_overwrite_data) {
-		awqLog(`appendQueueItem: Adding to queue with Overwriting: ${JSON.stringify(p_overwrite_data)}`);
+		awqDebug(`appendQueueItem: Adding to queue with Overwriting: ${JSON.stringify(p_overwrite_data)}`);
 		let jsonData = JSON.parse(itemJSON.value);
 		for(let setKey in p_overwrite_data) jsonData[setKey] = p_overwrite_data[setKey];
 		itemJSON.value = JSON.stringify(jsonData);
@@ -746,26 +718,26 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 		itemType.value = newType ? newType[1] : null;
 	})();
 
-	awqLogPublishMsg(`Added new ${itemType.value} queue item (${qty}x)`);
+	awqLog(`Added new ${itemType.value} queue item (${qty}x)`);
 	//Wait with updating state while loading a predefined queue
 	if(isNaN(p_qty)) updateQueueState();
 }
 
 function saveScriptSettings() {
-	awqLog('Saving script settings');
+	awqDebug('Saving script settings');
 	let scriptSettingsCopy = structuredClone(conf.scriptSettings);
 
 	//Delete data that does not need to be saved
 	for(let ssk in scriptSettingsCopy) for(let ssk2 in scriptSettingsCopy[ssk])
 		if(ssk2 != 'value') delete scriptSettingsCopy[ssk][ssk2];
 
-	conf.ui.defQueueQty.value = conf.scriptSettings.defaultQty.value; //Update beacuse this one is in two places
+	conf.ui.defQty.value = conf.scriptSettings.defQty.value; //Update beacuse this one is in two places
 	localStorage.awqScriptSettings = JSON.stringify(scriptSettingsCopy);
 }
 
 function loadScriptSettings(p_scriptSettings) {
 	if(!localStorage.hasOwnProperty("awqScriptSettings") || !isJsonString(localStorage.awqScriptSettings)) return;
-	awqLog('Loding saved script settings');
+	awqDebug('Loding saved script settings');
 
 	let savedSettings = p_scriptSettings || JSON.parse(localStorage.awqScriptSettings);
 	for(let ssk in conf.scriptSettings) if(savedSettings.hasOwnProperty(ssk))
@@ -773,11 +745,16 @@ function loadScriptSettings(p_scriptSettings) {
 }
 
 function openSettings() {
+	document.body.style.overflow = 'hidden';
 	let dialog = utils.mkDiv(utils.mkDiv(document.body, 'awq-popup')),
 	hdr = utils.mkDiv(dialog, 'awq-hdr'), body = utils.mkDiv(dialog, 'awq-settings')
 	utils.mkDiv(hdr, null, null, "<b>SDAtom Settings</b> - <i>Hold your mouse over an item for a description</i>");
 	let close = utils.mkDiv(hdr, null, {float:'right', textShadow:'#292929 2px 3px 5px', cursor:'pointer'}, '⛌');
-	close.onclick = () => {dialog.parentElement.remove(); saveScriptSettings()}
+	close.onclick = () => {
+		document.body.style.overflow = '';
+		dialog.parentElement.remove();
+		saveScriptSettings();
+	}
 
 	//Create input for each script setting
 	for(let ssKey in conf.scriptSettings) {
@@ -846,7 +823,8 @@ function openSettings() {
 	repAttr.type = 'text', repAttr.placeholder = '▼';
 	repAttr.setAttribute('list', 'awq-rep-attrs');
 	repAttr.onfocus = () => repAttr.select();
-	let repAttrData = utils.mkEl('datalist'), anyOption = utils.mkEl('option', repAttrData);
+	let repAttrData = utils.mkEl('datalist', replacer),
+	anyOption = utils.mkEl('option', repAttrData);
 	repAttrData.id = 'awq-rep-attrs', anyOption.value = c_any_value;
 	for(let key in foundAttrs) utils.mkEl('option', repAttrData).value = key;
 
@@ -855,17 +833,17 @@ function openSettings() {
 	repVal.type = 'text', repVal.placeholder = '▼';
 	repVal.setAttribute('list', 'awq-rep-vals');
 	repVal.onfocus = () => repVal.select();
-	let repValData = utils.mkEl('datalist');
+	let repValData = utils.mkEl('datalist', replacer);
 	repValData.id = 'awq-rep-vals';
 
+	console.log(foundAttrs, attrOpts);
+
 	//Update repValData
-	(repAttr.onchange = repVal.onchange = () => {
+	(repAttr.onchange = () => {
 		let foundValues = foundAttrs[repAttr.value];
-		repValData.innerHTML = '';
+		repValData.textContent = '';
 		repValData.appendChild(anyOption.cloneNode());
 		if(foundValues) {
-			repValData.innerHTML = '';
-			repValData.appendChild(anyOption.cloneNode());
 			//Add all possible values for currently selected attribute
 			for(let key in foundAttrs) utils.mkEl('option', repValData).value = key;
 		} else {
@@ -874,23 +852,11 @@ function openSettings() {
 		}
 	})();
 
-	utils.mkEl('label', replacer, null, null, "Old value");
+	utils.mkEl('label', replacer, null, null, "New value");
 	let repNewVal = utils.mkEl('input', replacer);
 	repNewVal.type = 'text', repNewVal.placeholder = '▼';
-	repNewVal.setAttribute('list', 'awq-rep-newvals');
+	repNewVal.setAttribute('list', 'awq-rep-vals');
 	repNewVal.onfocus = () => repNewVal.select();
-	let repNewValData = utils.mkEl('datalist');
-	repNewValData.id = 'awq-rep-newvals';
-
-	//Update repNewValData
-	let matchVals = [];
-	//Any components that has the option we are trying to replace?
-	attrOpts.forEach(arr => {if(arr.includes(repVal.value)) matchVals.push(arr)});
-	//If not add all their options
-	if(matchVals.length == 0) matchVals = [...attrOpts];
-	//Remove duplicates and replace dataset options
-	repNewValData.innerHTML = '';
-	[...new Set(matchVals.flat())].forEach(el => {utils.mkEl('option', repNewValData).value = el});
 
 	let repBtn = utils.mkEl('button', replacer, null, null, "Replace");
 	repBtn.onclick = () => {
@@ -907,23 +873,23 @@ function openSettings() {
 				for(let subKey in queueElentry) { //Loop queue entry attributes
 					if(anyOldValue) {
 						//Replace everything with the new value (why are you doing this?)
-						if(newValue != queueElentry[subKey]) awqLog(`replaceButton: updated queue item ${key} attribute ${subKey} to ${newValue}`);
+						if(newValue != queueElentry[subKey]) awqDebug(`replaceButton: updated queue item ${key} attribute ${subKey} to ${newValue}`);
 						queueElentry[subKey] = newValue;
 					} else {
 						//Search and replace in all attributes
 						let replacedValue = queueElentry[subKey].replaceAll ? queueElentry[subKey].replaceAll(oldValue, newValue) : queueElentry[subKey];
-						if(replacedValue != queueElentry[subKey]) awqLog(`replaceButton: updated queue item ${key} attribute ${subKey} to ${replacedValue}`);
+						if(replacedValue != queueElentry[subKey]) awqDebug(`replaceButton: updated queue item ${key} attribute ${subKey} to ${replacedValue}`);
 						queueElentry[subKey] = replacedValue;
 					}
 				}
 			} else if(anyOldValue) {
 				//Replace all values for this attribute
-				if(newValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
+				if(newValue != queueElentry[attributeValue]) awqDebug(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
 				queueElentry[attributeValue] = newValue;
 			} else {
 				//Replace string in specific attribute
 				let replacedValue = queueElentry[attributeValue].replaceAll(oldValue, newValue);
-				if(replacedValue != queueElentry[attributeValue]) awqLog(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
+				if(replacedValue != queueElentry[attributeValue]) awqDebug(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
 				queueElentry[attributeValue] = replacedValue;
 			}
 			currentQueue[key].value = JSON.stringify(queueElentry);
@@ -947,16 +913,16 @@ function toggleProcessButton(p_set_processing) {
 	let oldState = conf.commonData.processing;
 	if(p_set_processing == null) p_set_processing = !oldState;
 	else if(p_set_processing == oldState || conf.scriptSettings.stayReady.value) return;
-	awqLog(`toggleProcessButton:${p_set_processing}`);
+	awqDebug(`toggleProcessButton:${p_set_processing}`);
 	let pb = conf.ui.processBtn;
 	if(p_set_processing) {
-		awqLogPublishMsg('Processing <b>started</b>');
+		awqLog('Processing <b>started</b>');
 		conf.commonData.processing = true;
 		pb.style.background = 'green', pb.innerHTML = '⏸︎ ';
 		utils.mkDiv(pb, null, {display:'inline-block'}, '⚙️');
 		executeAllNewTasks();
 	} else {
-		awqLogPublishMsg('Processing <b>ended</b>');
+		awqLog('Processing <b>ended</b>');
 		conf.commonData.processing = conf.commonData.working = false;
 		conf.commonData.previousTaskStartTime = pb.style.background = null;
 		pb.innerHTML = c_processButtonText;
@@ -965,7 +931,7 @@ function toggleProcessButton(p_set_processing) {
 
 function updateQueueState() {
 	let queue = conf.ui.queueCont.getElementsByTagName('div');
-	awqLog('updateQueueState: old length:' + conf.currentQueue.length + ' new length:' + queue.length);
+	awqDebug(`updateQueueState: old length:${conf.currentQueue.length} new length:${queue.length}`);
 
 	let newArray = [];
 	for(let i = 0; i < queue.length; ++i) {
@@ -978,10 +944,10 @@ function updateQueueState() {
 	}
 	conf.currentQueue = newArray;
 	if(conf.scriptSettings.rememberQueue.value) {
-		awqLog('updateQueueState: Saving current queue state ' + conf.currentQueue.length);
+		awqDebug(`updateQueueState: Saving current queue state ${conf.currentQueue.length}`);
 		localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
 	} else {
-		awqLog('updateQueueState: Cleared current queue state');
+		awqDebug('updateQueueState: Cleared current queue state');
 		localStorage.removeItem("awqCurrentQueue");
 	}
 }
@@ -998,7 +964,7 @@ function updateStatus() {
 		.iBrowserContainer.el.style.display !== 'none' ? 'iBrowser' : 'other';
 
 	if(newType !== previousType) {
-		awqLog('updateStatus: active type changed to: ' + newType);
+		awqDebug(`updateStatus: active type changed to: ${newType}`);
 		conf.ui.overlay.style.display = conf.ui.msgBox.style.display = newType === 'other' ? 'none' : '';
 	}
 
@@ -1009,7 +975,7 @@ function updateStatus() {
 		stuckProcessingCounter = 0;
 	else if(!conf.scriptSettings.stayReady.value && ++stuckProcessingCounter > 30) {
 		//If no work is being done for a while disable queue
-		awqLog('updateStatus: stuck in processing queue status? Disabling queue processing');
+		awqDebug('updateStatus: stuck in processing queue status? Disabling queue processing');
 		toggleProcessButton(false);
 		stuckProcessingCounter = 0;
 		playWorkCompleteSound();
@@ -1018,12 +984,12 @@ function updateStatus() {
 
 async function executeAllNewTasks() {
 	while(conf.commonData.processing) {
-		//awqLog('executeNewTask: working='+conf.commonData.working);
 		if(conf.commonData.working) return; //Already working on task
 
 		if(conf.commonData.previousTaskStartTime) {
 			let timeSpent = Date.now() - conf.commonData.previousTaskStartTime;
-			awqLogPublishMsg(`Completed work on queue item after ${Math.floor(timeSpent / 1000 / 60)} minutes ${Math.round((timeSpent - Math.floor(timeSpent / 60000) * 60000) / 1000)} seconds`);
+			awqLog(`Completed work on queue item after ${Math.floor(timeSpent / 1000 / 60)} minutes ${
+				Math.round((timeSpent - Math.floor(timeSpent / 60000) * 60000) / 1000)} seconds`);
 		}
 
 		let queue = conf.ui.queueCont.getElementsByTagName('div');
@@ -1031,13 +997,13 @@ async function executeAllNewTasks() {
 			let itemQty = queue[i].querySelector('.AWQ-item-qty'),
 			itemType = queue[i].querySelector('.AWQ-item-type').value;
 			if(itemQty.value > 0) {
-				awqLog(`executeNewTask: found next work item with index ${i}, qty ${itemQty.value} and type ${itemType}`);
+				awqDebug(`executeNewTask: found next work item with index ${i}, qty ${itemQty.value} and type ${itemType}`);
 				conf.commonData.working = true;
 				await loadJson(queue[i].querySelector('.AWQ-item-JSON').value);
 				await clickStartButton(itemType);
 				itemQty.value = itemQty.value - 1;
 				itemQty.onchange();
-				awqLogPublishMsg(`Started working on ${itemType} queue item ${i + 1} (${itemQty.value} more to go) `);
+				awqLog(`Started working on ${itemType} queue item ${i + 1} (${itemQty.value} more to go) `);
 				conf.commonData.previousTaskStartTime = Date.now();
 				await waitForTaskToComplete(itemType);
 				queue = true;
@@ -1049,7 +1015,7 @@ async function executeAllNewTasks() {
 		if(queue !== true) {
 			if(conf.commonData.previousTaskStartTime) {
 				conf.commonData.previousTaskStartTime = null;
-				awqLog('executeNewTask: No more tasks found');
+				awqDebug('executeNewTask: No more tasks found');
 				playWorkCompleteSound();
 				toggleProcessButton(false);
 			}
@@ -1064,7 +1030,7 @@ function editSetting() {
 	let setStore = conf.ui.settingsStorage, setIdx = setStore.selectedIndex,
 	setOpt = setStore.options[setIdx], setKey = setOpt.innerHTML;
 	if(setKey == c_defaultTextStoredSettings) return;
-	awqLog('editSettings: index' + setIdx);
+	awqDebug(`editSettings: index ${setIdx}`);
 
 	//TODO Add to stylesheet instead of fixed style
 	document.body.style.overflow = 'hidden';
@@ -1091,7 +1057,7 @@ function editSetting() {
 		editCont.remove();
 
 		//Update data and refresh UI
-		awqLog(`editSettings: updating ${setKey} ${setKey==txtInput.value?'':' to '+txtInput.value}`);
+		awqDebug(`editSettings: updating ${setKey} ${setKey==txtInput.value?'':' to '+txtInput.value}`);
 		delete conf.savedSetting[setKey];
 		conf.savedSetting[txtInput.value] = txtArea.value;
 		localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
@@ -1116,28 +1082,28 @@ function saveSettings() {
 	let settingSetName = conf.commonData.activeType + '-' + conf.ui.settingName.value;
 	conf.savedSetting[settingSetName] = getValueJSON();
 	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-	awqLogPublishMsg(`Saved new setting set ` + settingSetName);
+	awqLog(`Saved new setting set ${settingSetName}`);
 	refreshSettings();
 }
 function refreshSettings() {
-	awqLog('refreshSettings: saved settings:' + Object.keys(conf.savedSetting).length);
-	conf.ui.settingName.value = conf.ui.settingsStorage.innerHTML = "";
+	let len = Object.keys(conf.savedSetting).length;
+	awqDebug(`refreshSettings: saved settings:${len}`);
+	conf.ui.settingName.value = conf.ui.settingsStorage.textContent = '';
 	for(let prop in conf.savedSetting) utils.mkEl('option',
 		conf.ui.settingsStorage, null, null, prop).value = conf.savedSetting[prop];
-	if(Object.keys(conf.savedSetting).length < 1) utils.mkEl('option',
-		conf.ui.settingsStorage, null, null, c_defaultTextStoredSettings).value = "";
+	if(len < 1) utils.mkEl('option', conf.ui.settingsStorage,
+		null, null, c_defaultTextStoredSettings).value = "";
 }
 async function loadSetting() {
 	if(conf.ui.settingsStorage.value.length < 1) return;
 	let itemName = conf.ui.settingsStorage.options[conf.ui.settingsStorage.selectedIndex].text;
-	let itemType = itemName.split('-')[0];
-	awqLog('loadSetting: ' + itemName);
+	awqDebug(`loadSetting: ${itemName}`);
 	await loadJson(conf.ui.settingsStorage.value);
 }
 function clearSetting() {
 	let ss = conf.ui.settingsStorage;
 	if(ss.value.length < 1) return;
-	awqLogPublishMsg(`Removed setting ` + ss.options[ss.selectedIndex].innerHTML);
+	awqLog(`Removed setting ${ss.options[ss.selectedIndex].innerHTML}`);
 	delete conf.savedSetting[ss.options[ss.selectedIndex].innerHTML];
 	ss.options[ss.selectedIndex].remove();
 	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
@@ -1147,7 +1113,7 @@ function clearSetting() {
 function clickStartButton(p_type) {
 	const c_max_time_to_wait = 100;
 	let targetButton = conf[conf.commonData.activeType].controls.genrateButton.el;
-	awqLog(`clickStartButton: working ${conf.commonData.working} waiting ${conf.commonData.working} type ${p_type}`);
+	awqDebug(`clickStartButton: working ${conf.commonData.working} waiting ${conf.commonData.working} type ${p_type}`);
 	if(conf.commonData.waiting) return;
 	targetButton.click();
 	conf.commonData.waiting = true;
@@ -1157,11 +1123,11 @@ function clickStartButton(p_type) {
 			++retryCount;
 			if(retryCount >= c_max_time_to_wait) {
 				targetButton.click(); retryCount = 0;
-				awqLog(`Work has not started after ${c_max_time_to_wait / 10} seconds, clicked again`);
+				awqDebug(`Work has not started after ${c_max_time_to_wait / 10} seconds, clicked again`);
 			}
 			if(!webUICurrentyWorkingOn(p_type)) return;
 			conf.commonData.waiting = false;
-			awqLog('clickStartButton: work has started');
+			awqDebug('clickStartButton: work has started');
 			clearInterval(waitForSwitchInterval);
 			resolve();
 		}, c_wait_tick_duration);
@@ -1170,7 +1136,7 @@ function clickStartButton(p_type) {
 
 function switchTabAndWait(p_type) {
 	if(p_type == conf.commonData.activeType) return;
-	awqLog('switchTabAndWait: ' + p_type);
+	awqDebug(`switchTabAndWait:${p_type}`);
 	conf.shadowDOM.root.querySelector(conf[p_type].controls.tabButton.sel).click(); //Using .el doesn't work
 	conf.commonData.waiting = true;
 	return new Promise(resolve => {
@@ -1178,7 +1144,7 @@ function switchTabAndWait(p_type) {
 		let waitForSwitchInterval = setInterval(() => {
 			if(conf.commonData.activeType !== p_type) return;
 			conf.commonData.waiting = false;
-			awqLogPublishMsg(`Switched active tab from ${startingTab} to ${conf.commonData.activeType}`);
+			awqLog(`Switched active tab from ${startingTab} to ${conf.commonData.activeType}`);
 			clearInterval(waitForSwitchInterval);
 			resolve();
 		}, c_wait_tick_duration);
@@ -1186,7 +1152,7 @@ function switchTabAndWait(p_type) {
 }
 
 function switchTabAndWaitUntilSwitched(p_targetTabName, p_tabConfig) {
-	awqLog('switchTabAndWaitUntilSwitched: p_target=' + p_targetTabName + ' p_config=' + p_tabConfig);
+	awqDebug(`switchTabAndWaitUntilSwitched: p_target:${p_targetTabName} p_config:${p_tabConfig}`);
 	let targetTabConf = p_tabConfig.filter((elem) => {return elem.name == p_targetTabName})[0];
 	function correctTabVisible() {
 		return conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display != 'none';
@@ -1198,7 +1164,7 @@ function switchTabAndWaitUntilSwitched(p_targetTabName, p_tabConfig) {
 		let waitForSwitchInterval = setInterval(() => {
 			if(!correctTabVisible()) return;
 			conf.commonData.waiting = false;
-			awqLog('switchTabAndWaitUntilSwitched: switch complete');
+			awqDebug('switchTabAndWaitUntilSwitched: switch complete');
 			clearInterval(waitForSwitchInterval);
 			resolve();
 		}, c_wait_tick_duration);
@@ -1218,13 +1184,13 @@ function webUICurrentyWorkingOn(p_itemType) {
 }
 
 function waitForTaskToComplete(p_itemType) {
-	awqLog(`waitForTaskToComplete: Waiting to complete work for ${p_itemType}`);
+	awqDebug(`waitForTaskToComplete: Waiting to complete work for ${p_itemType}`);
 	conf.commonData.waiting = true;
 	return new Promise(resolve => {
 		let waitForCompleteInterval = setInterval(() => {
 			if(webUICurrentyWorkingOn(p_itemType)) return;
 			clearInterval(waitForCompleteInterval);
-			awqLog(`Work is complete for ${p_itemType}`);
+			awqDebug(`Work is complete for ${p_itemType}`);
 			conf.commonData.waiting = conf.commonData.working = false;
 			resolve();
 		}, c_wait_tick_duration);
@@ -1245,8 +1211,8 @@ function filterPrompt(p_prompt_text, p_neg) {
 		let tmpNewPromptText = newPromptText.replace(regEx, promptFilter[i].replace);
 		if(tmpNewPromptText !== newPromptText) {
 			let changesCount = levenshteinDist(newPromptText, tmpNewPromptText);
-			awqLogPublishMsg(`Filtered ${p_neg ? '(neg)' : ''}prompt with filter (${promptFilter[i].desc}), ${changesCount} char changes`);
-			awqLog(`Filtered from:<pre>${newPromptText}</pre>to:<pre>${tmpNewPromptText}</pre>`);
+			awqLog(`Filtered ${p_neg ? '(neg)' : ''}prompt with filter (${promptFilter[i].desc}), ${changesCount} char changes`);
+			awqDebug(`Filtered from:<pre>${newPromptText}</pre>to:<pre>${tmpNewPromptText}</pre>`);
 			newPromptText = tmpNewPromptText;
 		}
 	}
@@ -1261,14 +1227,14 @@ function exportImport(input) {
 	});
 	let importJSON = input.value;
 	if(importJSON.length < 1) {
-		awqLogPublishMsg(`Exported script data`);
+		awqLog('Exported script data');
 		input.value = exportJSON;
 		input.focus(), input.select();
 		return;
 	}
-	if(!isJsonString(importJSON)) return alert(`There is something wrong with the import data provided`);
-	if(exportJSON == importJSON) return alert(`The input data is the same as the current script data`);
-	awqLog('Data has changed');
+	if(!isJsonString(importJSON)) return alert('There is something wrong with the import data provided');
+	if(exportJSON == importJSON) return alert('The input data is the same as the current script data');
+	awqDebug('Data has changed');
 	let parsedImportJSON = JSON.parse(importJSON);
 	conf.savedSetting = parsedImportJSON.savedSetting;
 	conf.currentQueue = parsedImportJSON.currentQueue;
@@ -1313,7 +1279,7 @@ function levenshteinDist(s1, s2) {
 
 function getValueJSON(p_type) {
 	let type = p_type || conf.commonData.activeType;
-	awqLog('getValueJSON: type=' + type);
+	awqDebug(`getValueJSON: type:${type}`);
 	let valueJSON = {type: type};
 
 	if(type == 'ext') { //Needs special saving since it's not an input but a tab switch
@@ -1348,7 +1314,7 @@ function getValueJSON(p_type) {
 					if(prop == 'negPrompt' && conf.scriptSettings.promptFilterNegative.value) valueJSON[prop] = filterPrompt(valueJSON[prop], true);
 				}
 			} catch(e) {
-				awqLogPublishError(`Failed to retrieve settings for ${type} item ${prop} with error ${e.message}: <pre style="margin: 0;">${e.stack}</pre>`);
+				awqErr(`Failed to retrieve settings for ${type} item ${prop} with error ${e.message}: <pre>${e.stack}</pre>`);
 			}
 		}
 	}
@@ -1360,17 +1326,17 @@ async function loadJson(p_json) {
 	let inputJSONObject = JSON.parse(p_json);
 	let type = inputJSONObject.type ? inputJSONObject.type : conf.commonData.activeType;
 	let oldData = JSON.parse(getValueJSON(type));
-	awqLog('loadJson: ' + type);
+	awqDebug(`loadJson:${type}`);
 
 	let currentModel = getGradVal(conf.commonData.sdModelCheckpoint.gradEl);
 	if(currentModel == inputJSONObject.sdModelCheckpoint) {
-		awqLog('loadJson: Correct model already loaded: ' + currentModel);//No action needed
+		awqDebug(`loadJson: Correct model already loaded:${currentModel}`);//No action needed
 	} else if(conf.commonData.sdModelCheckpoint.gradEl.props.choices.includes(inputJSONObject.sdModelCheckpoint)) { //Check if model exists
-		awqLog('loadJson: Trying to load model: ' + inputJSONObject.sdModelCheckpoint);
+		awqDebug(`loadJson: Trying to load model:${inputJSONObject.sdModelCheckpoint}`);
 		setGradVal(conf.commonData.sdModelCheckpoint.gradEl, inputJSONObject.sdModelCheckpoint);
 		setCheckpointWithPost(inputJSONObject.sdModelCheckpoint); //Only setting gradio config no longer works?
 	} else {
-		awqLogPublishError(`Model ${inputJSONObject.sdModelCheckpoint} was not found, using current model ${currentModel}`);
+		awqErr(`Model ${inputJSONObject.sdModelCheckpoint} was not found, using current model ${currentModel}`);
 	}
 
 	if(conf.commonData.activeType != inputJSONObject.type) await switchTabAndWait(inputJSONObject.type); //Switch tab?
@@ -1391,8 +1357,8 @@ async function loadJson(p_json) {
 			if(conf[type][prop].el) {
 				if(conf[type][prop].el.type == 'fieldset') {
 					triggerOnBaseElem = false; //No need to trigger this on base element
-					conf[type][prop].el.querySelector('[value="' + inputJSONObject[prop] + '"]').checked = true;
-					triggerChange(conf[type][prop].el.querySelector('[value="' + inputJSONObject[prop] + '"]'));
+					conf[type][prop].el.querySelector(`[value="${inputJSONObject[prop]}"]`).checked = true;
+					triggerChange(conf[type][prop].el.querySelector(`[value="${inputJSONObject[prop]}"]`));
 				} else if(conf[type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
 					let currentValue = conf[type][prop].el.classList.contains('input-accordion-open');
 					if(inputJSONObject[prop] != currentValue) {
@@ -1421,56 +1387,46 @@ async function loadJson(p_json) {
 			}
 			if(triggerOnBaseElem) triggerChange(conf[type][prop].el);
 		} catch(e) {
-			awqLogPublishError(`Failed to load settings for ${type} item ${prop} with error ${e.message}: <pre style="margin: 0;">${e.stack}</pre>`);
+			awqErr(`Failed to load settings for ${type} item ${prop} with error ${e.message}: <pre>${e.stack}</pre>`);
 		}
 	}
-	awqLog(loadOutput.replace(/\|\s$/, ''));
+	awqDebug(loadOutput.replace(/\|\s$/, ''));
 	forceGradioUIUpdate();
 }
 
 function waitForElm(selector) {
 	return new Promise(resolve => {
-		if(document.querySelector(selector)) {
+		if(document.querySelector(selector))
 			return resolve(document.querySelector(selector));
-		}
 
-		const observer = new MutationObserver(mutations => {
+		const observer = new MutationObserver(() => {
 			if(document.querySelector(selector)) {
 				resolve(document.querySelector(selector));
 				observer.disconnect();
 			}
 		});
 
-		observer.observe(document.body, {
-			childList: true,
-			subtree: true
-		});
+		observer.observe(document.body, {childList: true, subtree: true});
 	});
 }
 function setCheckpointWithPost(p_target_cp) {
-	awqLog('setCheckpointWithPost: ' + p_target_cp);
+	awqDebug(`setCheckpointWithPost:${p_target_cp}`);
 	let targetCheckpoint = p_target_cp.replace('/', '//').replace('\\', '\\\\');
 
 	//Try to find fn_index for the switch checkpoint "function"
 	let checkPointGradioElemId = conf.commonData.sdModelCheckpoint.gradEl.id;
 	let fnIndex = gradio_config.dependencies.filter(comp => comp.inputs[0] == checkPointGradioElemId);
 	fnIndex = fnIndex ? gradio_config.dependencies.indexOf(fnIndex[0]) : null;
-	if(fnIndex) {
-		awqLog('setCheckpointWithPost: found fn_index ' + fnIndex);
-	} else {
-		awqLogPublishError('setCheckpointWithPost: failed to find fn_index for model change');
-		return;
-	}
+	if(fnIndex) awqDebug(`setCheckpointWithPost: found fn_index ${fnIndex}`);
+	else return awqErr('setCheckpointWithPost: failed to find fn_index for model change');
 
 	fetch("/run/predict", {
-		method: "POST",
-		headers: {"Content-Type": "application/json"},
-		redirect: "follow",
+		method: "POST", headers: {"Content-Type": "application/json"}, redirect: "follow",
 		body: `{"fn_index":${fnIndex},"data":["${targetCheckpoint}"],"event_data":null,"session_hash":"trlwn215an"}`
 	}).then(response => {
-		awqLog(`setCheckpointWithPost: repsonse: ${response.status}-${response.statusText}: ${JSON.stringify(response.json())}`);
+		awqDebug(`setCheckpointWithPost: repsonse: ${response.status}-${response.statusText}: ${JSON.stringify(response.json())}`);
 	}).catch(error => {
-		awqLog(`setCheckpointWithPost: error: ${JSON.stringify(error)}`);
+		awqDebug(`setCheckpointWithPost: error: ${JSON.stringify(error)}`);
 	});;
 }
 
@@ -1489,11 +1445,7 @@ function findGradioComponentState(p_elem_id) {
 function findGradioComponentStateByLabel(p_elem_label) {
 	return gradio_config.components.filter(comp => comp.props.label == p_elem_label);
 }
-function getGradVal(p_grad_comp) {
-	return p_grad_comp.props.value;
-}
-function setGradVal(p_grad_comp, p_val) {
-	p_grad_comp.props.value = p_val;
-}
+function getGradVal(p_grad_comp) { return p_grad_comp.props.value; }
+function setGradVal(p_grad_comp, p_val) { p_grad_comp.props.value = p_val; }
 
 })();
