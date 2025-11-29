@@ -1,7 +1,7 @@
 //==UserScript==
 //@name         SDAtom-WebUi-us
 //@namespace    SDAtom-WebUi-us
-//@version      1.4.4
+//@version      1.5.0
 //@description  Queue for AUTOMATIC1111 WebUi and an option to saving settings
 //@author       Kryptortio
 //@homepage     https://github.com/Kryptortio/SDAtom-WebUi-us
@@ -14,8 +14,8 @@
 'use strict';
 (() => {
 
-const c_scriptVersion = typeof GM_info == 'undefined' ? '1.3.2' : GM_info.script.version,
-c_scriptHandeler = typeof GM_info == 'undefined' ? '(not user script)' : GM_info.scriptHandler;
+const Ver = typeof GM_info == 'undefined' ? '1.3.2' : GM_info.script.version,
+Handler = typeof GM_info == 'undefined' ? '(not user script)' : GM_info.scriptHandler;
 
 //From https://github.com/Pecacheu/Utils.js
 //Create element of type with parent, className, style object, and innerHTML string
@@ -32,9 +32,19 @@ utils.mkEl = (t,p,c,s,i) => {
 utils.mkDiv = (p,c,s,i) => utils.mkEl('div',p,c,s,i);
 
 //----------------------------------------------------------------------------- Config
-let conf = {
+
+const TickDelay = 200,
+WaitForStart = 10000,
+AnyValue = "<ANY VALUE>",
+EmptyQueueTxt = "Queue is empty",
+AddQueueTxt = "Add to queue",
+AddQueueDesc = "You can also use ALT + Q",
+AddQueueDescAlt = "Override w/ alt preset; You can also use ALT + ",
+ProcessTxt = "Process Queue",
+AltOpts = {description: "When Alt key is pressed, current generation settings are added to the queue, but with the overrides below applied", type: 'json'},
+Conf = {
 	shadowDOM: {sel: "gradio-app"},
-	commonData: {
+	common: {
 		t2iContainer: {sel: "#tab_txt2img"},
 		i2iContainer: {sel: "#tab_img2img"},
 		extContainer: {sel: "#tab_extras"},
@@ -42,13 +52,13 @@ let conf = {
 		versionContainer: {sel: "#footer .versions"},
 		working: false,
 		processing: false,
-		waiting: false,
+		waiting: false
 	},
 	t2i: {
 		controls: {
 			tabButton: {sel: "#tabs > div:nth-child(1) > button:nth-child(1)"},
 			genrateButton: {sel: "#txt2img_generate"},
-			skipButton: {sel: "#txt2img_skip"},
+			skipButton: {sel: "#txt2img_skip"}
 		},
 		prompt: {sel: "#txt2img_prompt textarea"},
 		negPrompt: {sel: "#txt2img_neg_prompt textarea"},
@@ -56,8 +66,6 @@ let conf = {
 		sampleMethod: {grad: "txt2img_sampling"},
 		width: {sel: "#txt2img_width [id^=range_id]", sel2: "#txt2img_width input"},
 		height: {sel: "#txt2img_height [id^=range_id]", sel2: "#txt2img_height input"},
-		/*restoreFace: {sel:"#txt2img_settings #setting_face_restoration input"},
-		tiling: {sel:"#txt2img_settings #setting_tiling input"},*/
 		highresFix: {sel: "#txt2img_hr"},
 		hrFixUpscaler: {grad: "txt2img_hr_upscaler"},
 		hrFixSteps: {sel: "#txt2img_hires_steps [id^=range_id]", sel2: "#txt2img_hires_steps input"},
@@ -74,12 +82,9 @@ let conf = {
 		varStr: {sel: "#txt2img_subseed_strength [id^=range_id]", sel2: "#txt2img_subseed_strength input"},
 		varRSFWidth: {sel: "#txt2img_seed_resize_from_w [id^=range_id]", sel2: "#txt2img_seed_resize_from_w input"},
 		varRSFHeight: {sel: "#txt2img_seed_resize_from_h [id^=range_id]", sel2: "#txt2img_seed_resize_from_h input"},
-
 		script: {grad: "script_list", gradIndex: 0},
-
 		scriptPromptMatrixPutVar: {sel: "#script_txt2img_prompt_matrix_put_at_start input"},
 		scriptPromptMatrixUseDiff: {sel: "#script_txt2img_prompt_matrix_different_seeds input"},
-
 		scriptXYZXtype: {grad: "script_txt2img_xyz_plot_x_type"},
 		scriptXYZXVals: {sel: "#script_txt2img_xyz_plot_x_values textarea"},
 		scriptXYZYtype: {grad: "script_txt2img_xyz_plot_y_type"},
@@ -90,7 +95,7 @@ let conf = {
 		scriptXYZIncludeSubImg: {sel: "#script_txt2img_xyz_plot_include_lone_images input"},
 		scriptXYZIncludeSubGrid: {sel: "#script_txt2img_xyz_plot_include_sub_grids input"},
 		scriptXYZKeepMOne: {sel: "#script_txt2img_xyz_plot_no_fixed_seeds input"},
-		scriptXYZGridMargin: {sel: "#script_txt2img_xyz_plot_margin_size [id^=range_id]", sel2: "#script_txt2img_xyz_plot_margin_size input"},
+		scriptXYZGridMargin: {sel: "#script_txt2img_xyz_plot_margin_size [id^=range_id]", sel2: "#script_txt2img_xyz_plot_margin_size input"}
 	},
 	i2i: {
 		controls: {
@@ -103,8 +108,8 @@ let conf = {
 				{name: "inpaint", buttonSel: "#mode_img2img button:nth-child(3)", containerSel: "#img2img_inpaint_tab"},
 				{name: "inpaintSketch", buttonSel: "#mode_img2img button:nth-child(4)", containerSel: "#img2img_inpaint_sketch_tab"},
 				{name: "inpaintUpload", buttonSel: "#mode_img2img button:nth-child(5)", containerSel: "#img2img_inpaint_upload_tab"},
-				{name: "batch", buttonSel: "#mode_img2img button:nth-child(6)", containerSel: "#img2img_batch_tab"},
-			],
+				{name: "batch", buttonSel: "#mode_img2img button:nth-child(6)", containerSel: "#img2img_batch_tab"}
+			]
 		},
 		prompt: {sel: "#img2img_prompt textarea"},
 		negPrompt: {sel: "#img2img_neg_prompt textarea"},
@@ -121,8 +126,6 @@ let conf = {
 		sampleMethod: {grad: "img2img_sampling"},
 		width: {sel: "#img2img_width [id^=range_id]", sel2: "#img2img_width input"},
 		height: {sel: "#img2img_height [id^=range_id]", sel2: "#img2img_height input"},
-		/*restoreFace: {sel:"#img2img_settings #setting_face_restoration input"},
-		tiling: {sel:"#img2img_settings #setting_tiling input"},*/
 		batchCount: {sel: "#img2img_batch_count [id^=range_id]", sel2: "#img2img_batch_count input"},
 		batchSize: {sel: "#img2img_batch_size [id^=range_id]", sel2: "#img2img_batch_size input"},
 		cfg: {sel: "#img2img_cfg_scale [id^=range_id]", se2: "#img2img_cfg_scale input"},
@@ -133,12 +136,9 @@ let conf = {
 		varStr: {sel: "#img2img_subseed_strength input", sel2: "#img2img_subseed_strength [id^=range_id]"},
 		varRSFWidth: {sel: "#img2img_seed_resize_from_w input", sel2: "#img2img_seed_resize_from_w [id^=range_id]"},
 		varRSFHeight: {sel: "#img2img_seed_resize_from_h input", sel2: "#img2img_seed_resize_from_h [id^=range_id]"},
-
 		script: {grad: "script_list", gradIndex: 1},
-
 		scriptPromptMatrixPutVar: {sel: "#script_img2img_prompt_matrix_put_at_start input"},
 		scriptPromptMatrixUseDiff: {sel: "#script_img2img_prompt_matrix_different_seeds input"},
-
 		scriptXYZXtype: {grad: "script_img2img_xyz_plot_x_type"},
 		scriptXYZXVals: {sel: "#script_img2img_xyz_plot_x_values textarea"},
 		scriptXYZYtype: {grad: "script_img2img_xyz_plot_y_type"},
@@ -150,7 +150,6 @@ let conf = {
 		scriptXYZIncludeSubGrid: {sel: "#script_img2img_xyz_plot_include_sub_grids input"},
 		scriptXYZKeepMOne: {sel: "#script_img2img_xyz_plot_no_fixed_seeds input"},
 		scriptXYZGridMargin: {sel: "#script_img2img_xyz_plot_margin_size [id^=range_id]", sel2: "#script_img2img_xyz_plot_margin_size input"},
-
 		scripti2iAltTestOverrideSampM: {sel: "#script_img2img_alternative_test_override_sampler input"},
 		scripti2iAltTestOverrideProm: {sel: "#script_img2img_alternative_test_override_prompt input"},
 		scripti2iAltTestOrigProm: {sel: "#script_img2img_alternative_test_original_prompt textarea"},
@@ -161,12 +160,10 @@ let conf = {
 		scripti2iAltTestDecCFG: {sel: "#script_img2img_alternative_test_cfg input", sel2: "#script_img2img_alternative_test_cfg [id^=range_id]"},
 		scripti2iAltTestRand: {sel: "#script_img2img_alternative_test_randomness input", sel2: "#script_img2img_alternative_test_randomness [id^=range_id]"},
 		scripti2iAltTestSigma: {sel: "#script_img2img_alternative_test_sigma_adjustment input"},
-
 		scriptLoopbackLoops: {sel: "#script_loopback_loops input", sel2: "#script_loopback_loops [id^=range_id]"},
 		scriptLoopbackDenoStr: {sel: "#script_loopback_final_denoising_strength input", sel2: "#script_loopback_final_denoising_strength [id^=range_id]"},
 		scriptLoopbackDenoStrCurve: {gradLab: "Denoising strength curve"},
 		scriptLoopbackAppend: {gradLab: "Append interrogated prompt at each iteration"},
-
 		scriptOutPMK2Pixels: {sel: "#script_outpainting_mk2_pixels input", sel2: "#script_outpainting_mk2_pixels [id^=range_id]"},
 		scriptOutPMK2MaskBlur: {sel: "#script_outpainting_mk2_mask_blur input", sel2: "#script_outpainting_mk2_mask_blur [id^=range_id]"},
 		scriptOutPMK2Left: {sel: "#script_outpainting_mk2_direction label:nth-child(1) input"},
@@ -175,7 +172,6 @@ let conf = {
 		scriptOutPMK2Down: {sel: "#script_outpainting_mk2_direction label:nth-child(4) input"},
 		scriptOutPMK2FallOff: {sel: "#script_outpainting_mk2_noise_q input", sel2: "#script_outpainting_mk2_noise_q [id^=range_id]"},
 		scriptOutPMK2ColorVar: {sel: "#script_outpainting_mk2_color_variation input", sel2: "#script_outpainting_mk2_color_variation [id^=range_id]"},
-
 		scriptPoorManPixels: {sel: "#script_poor_mans_outpainting_pixels input", sel2: "#script_poor_mans_outpainting_pixels [id^=range_id]"},
 		scriptPoorManMaskBlur: {sel: "#script_poor_mans_outpainting_mask_blur input", sel2: "#script_poor_mans_outpainting_mask_blur [id^=range_id]"},
 		scriptPoorManMaskCont: {sel: "#script_poor_mans_outpainting_inpainting_fill"},
@@ -183,10 +179,9 @@ let conf = {
 		scriptPoorManRight: {sel: "#script_poor_mans_outpainting_direction label:nth-child(2) input"},
 		scriptPoorManUp: {sel: "#script_poor_mans_outpainting_direction label:nth-child(3) input"},
 		scriptPoorManDown: {sel: "#script_poor_mans_outpainting_direction label:nth-child(4) input"},
-
 		scriptSDUpTile: {sel: "#script_sd_upscale_overlap input", sel2: "#script_sd_upscale_overlap [id^=range_id]"},
 		scriptSDUpScale: {sel: "#script_sd_upscale_scale_factor input", sel2: "#script_sd_upscale_scale_factor [id^=range_id]"},
-		scriptSDUpUpcaler: {sel: "#script_sd_upscale_upscaler_index"},
+		scriptSDUpUpcaler: {sel: "#script_sd_upscale_upscaler_index"}
 	},
 	ext: {
 		controls: {
@@ -195,13 +190,13 @@ let conf = {
 			loadingElement: {sel: "#html_info_x_extras .wrap"},
 			extrasResizeMode: [
 				{name: "scaleBy", buttonSel: "#extras_resize_mode button:nth-child(1)", containerSel: "#extras_scale_by_tab"},
-				{name: "scaleTo", buttonSel: "#extras_resize_mode button:nth-child(2)", containerSel: "#extras_scale_to_tab"},
+				{name: "scaleTo", buttonSel: "#extras_resize_mode button:nth-child(2)", containerSel: "#extras_scale_to_tab"}
 			],
 			extrasMode: [
 				{name: "singleImg", buttonSel: "#mode_extras button:nth-child(1)", containerSel: "#extras_single_tab"},
 				{name: "batchProcess", buttonSel: "#mode_extras button:nth-child(2)", containerSel: "#extras_batch_process_tab"},
-				{name: "batchDir", buttonSel: "#mode_extras button:nth-child(3)", containerSel: "#extras_batch_directory_tab"},
-			],
+				{name: "batchDir", buttonSel: "#mode_extras button:nth-child(3)", containerSel: "#extras_batch_directory_tab"}
+			]
 		},
 		scaleByResize: {sel: "#extras_upscaling_resize input", sel2: "#extras_upscaling_resize [id^=range_id]"},
 		scaleToWidth: {sel: "#extras_upscaling_resize_w input"},
@@ -215,7 +210,7 @@ let conf = {
 		upscale2Vis: {sel: "#extras_upscaler_2_visibility input", sel2: "#extras_upscaler_2_visibility [id^=range_id]"},
 		GFPGANVis: {sel: "#extras_gfpgan_visibility input", sel2: "#extras_gfpgan_visibility [id^=range_id]"},
 		CodeFormVis: {sel: "#extras_codeformer_visibility input", sel2: "#extras_codeformer_visibility [id^=range_id]"},
-		CodeFormWeight: {sel: "#extras_codeformer_weight input", sel2: "#extras_codeformer_weight [id^=range_id]"},
+		CodeFormWeight: {sel: "#extras_codeformer_weight input", sel2: "#extras_codeformer_weight [id^=range_id]"}
 	},
 	extensions: {
 		iBrowser: {
@@ -229,38 +224,22 @@ let conf = {
 				txt2imgG: {sel: '#image_browser_tab_txt2img-grids_image_browser_file_info textarea'},
 				img2imgG: {sel: '#image_browser_tab_img2img-grids_image_browser_file_info textarea'},
 				extras: {sel: '#image_browser_tab_extras_image_browser_file_info textarea'},
-				favorites: {sel: '#image_browser_tab_favorites_image_browser_file_info textarea'},
+				favorites: {sel: '#image_browser_tab_favorites_image_browser_file_info textarea'}
 			},
 			ui: {},
 			text: {
 				queueVariationsButtonText: 'Add 5 variations',
-				queueHiResVersionButtonText: 'Add HiRes version',
+				queueHiResVersionButtonText: 'Add HiRes version'
 			},
 			functions: {
+				//Used when loading prompt from image browser
 				getValueJSON: () => {
 					awqDebug('iBrowser.getValueJSON: parsing data');
-					let valueJSON = {type: 't2i'},
-					currentTab = document.querySelector('#image_browser_tabs_container button.selected').innerHTML;
-					currentTab = currentTab.replace(/\s/g, '');
-					currentTab = currentTab.replace('-grids', 'G').toLowerCase(),
-					generationInfoValue = conf.extensions.iBrowser.guiElems[currentTab].el.value;
-
-					//Used when loading prompt from image browser
-					/*
-					Kind of using the logic from generation_parameters_copypaste.py/parse_generation_parameters (but not really, because that doesn't account for Template/Negative Template)
-					Structure
-					<prompt>
-					Negative prompt: <negative prompt>
-					a1: b1, a2: b2, etc
-					Template: <template>
-					Negative Template: <negative template>
-
-					<prompt>, <negative prompt>, <template> and <negative template> can all be multiline, or missing.
-					Maybe assume that <prompt> is never missing?
-					*/
-					let lines = generationInfoValue.split(/\r?\n/),
-					whichLine = 0; //0=prompt, 1=negPrompt, 2=template, 3=negTemplate, 4: dictionary
-					valueJSON['prompt'] = '', valueJSON['negPrompt'] = '';
+					let json = {type: 't2i'}, currentTab = document.querySelector('#image_browser_tabs_container button.selected')
+						.innerHTML.replace(/\s/g, '').replace('-grids', 'G').toLowerCase(),
+					lines = Conf.extensions.iBrowser.guiElems[currentTab].el.value.split(/\r?\n/),
+					whichLine = 0; //0=prompt, 1=negPrompt, 2=template, 3=negTemplate, 4=dictionary
+					json.prompt = json.negPrompt = '';
 
 					for(let l of lines) {
 						if(l.startsWith("Negative prompt: ")) whichLine = 1, l = l.slice(17);
@@ -270,182 +249,170 @@ let conf = {
 
 						switch(whichLine) {
 						case 0:
-							valueJSON['prompt'] += l;
+							json.prompt += l;
 							break;
 						case 1:
-							valueJSON['negPrompt'] += l;
+							json.negPrompt += l;
 							break;
-						case 2:
+						case 2: case 3:
 							break; //ignore template
-						case 3:
-							break; //ignore neg template
 						case 4:
 							for(let v of l.split(/, /)) {
 								let kv = v.split(/: /);
 								switch(kv[0]) {
 								case "Steps":
-									valueJSON['sample'] = kv[1];
+									json.sample = kv[1];
 									break;
 								case "Sampler":
-									valueJSON['sampleMethod'] = kv[1];
+									json.sampleMethod = kv[1];
 									break;
 								case "CFG scale":
-									valueJSON['cfg'] = kv[1];
+									json.cfg = kv[1];
 									break;
 								case "Seed":
-									valueJSON['seed'] = kv[1];
+									json.seed = kv[1];
 									break;
 								case "Size":
 									let wh = kv[1].split(/x/)
-									valueJSON['width'] = wh[0];
-									valueJSON['height'] = wh[1];
+									json.width = wh[0];
+									json.height = wh[1];
 									break;
 								case "Model":
-									valueJSON['sdModelCheckpoint'] = kv[1];
+									json.sdModelCheckpoint = kv[1];
 									break;
 								case "Denoising strength":
-									valueJSON['hrFixdenoise'] = kv[1];
+									json.hrFixdenoise = kv[1];
 									break;
 								case "Hires upscale":
-									valueJSON['hrFixUpscaleBy'] = kv[1];
-									valueJSON['highresFix'] = true;
+									json.hrFixUpscaleBy = kv[1];
+									json.highresFix = true;
 									break;
 								case "Hires upscaler":
-									valueJSON['hrFixUpscaler'] = kv[1];
+									json.hrFixUpscaler = kv[1];
 								}
 							}
 						}
 					}
-					return JSON.stringify(valueJSON);
-				},
-			},
-		},
+					return json;
+				}
+			}
+		}
 	},
 	ui: {},
-	scriptSettings: {
-		defQty: {name: "Default queue quantity", description: "Default number of times to execute each queue item", type: "numeric", value: 1},
-		rememberQueue: {name: "Remember queue", description: "Remember the queue if you reload the page", type: "boolean", value: true},
-		stayReady: {name: "Stay ready", description: "Remain ready after end-of-queue until manually stopped", type: "boolean", value: false},
-		notificationSound: {name: "Notification sound", description: "Sound to be played when processing of queue items stops", type: "boolean", value: true},
-		extensionScript: {name: "Extension script(s)", description: "https://github.com/Kryptortio/SDAtom-WebUi-us#script-extensions", type: "text", value: ""},
-		promptFilter: {name: "Prompt filter(s)", description: "https://github.com/Kryptortio/SDAtom-WebUi-us#prompt-filter", type: "text", value: ""},
-		promptFilterNegative: {name: "Filter negative prompt", description: "Apply the prompt filter to the negative filter as well", type: "boolean", value: false},
-		autoscrollOutput: {name: "Autoscroll console", description: "Scroll console automatically when new lines appear", type: "boolean", value: true},
-		verboseLog: {name: "Verbose console", description: "Log as much as possible to the console", type: "boolean", value: false},
-		maxOutputLines: {name: "Max console lines", description: "The maximum number of lines that can be shown in the console box", type: "numeric", value: 500},
-		overwriteQueueSettings1: {name: "Alt 1 overwrite", description: "Add settings you want to overwrite the current settings with when you click the Alt 1 button to add to queue (same format as in the queue)", type: "text", value: '{"width":768, "height":768}'},
-		overwriteQueueSettings2: {name: "Alt 2 overwrite", description: "Add settings you want to overwrite the current settings with when you click the Alt 2 button to add to queue (same format as in the queue)", type: "text", value: '{"width":1024, "height":1024}'},
-		overwriteQueueSettings3: {name: "Alt 3 overwrite", description: "Add settings you want to overwrite the current settings with when you click the Alt 3 button to add to queue (same format as in the queue)", type: "text", value: '{"sample":20, "sampleMethod":"Euler a", "width":512, "height":512, "restoreFace":false, "tiling":false, "batchCount":1, "batchSize":1, "cfg":7, "seed":-1, "extra":false, "varSeed":-1, "varStr":0}'},
-		buttonOpacity: {name: "Button transparency", description: "Change how visible the floating buttons in the corner should be", type: "numeric", value: 0.7},
+	settings: {
+		defQty: {name: "Default queue quantity", description: "Default times to execute each queue item", type: 'int', value: 1, min: 1},
+		rememberQueue: {name: "Remember queue", description: "Remember the queue if you reload the page", type: 'bool', value: true},
+		stayReady: {name: "Stay ready", description: "Remain ready after end-of-queue until manually stopped", type: 'bool', value: false},
+		notifSound: {name: "Notification sound", description: "Sound to be played when processing of queue items stops", type: 'bool', value: true},
+		extensionScript: {name: "Extension script(s)", description: "https://github.com/Kryptortio/SDAtom-WebUi-us#script-extensions", type: 'text', value: ''},
+		filter: {name: "Prompt filter(s)", description: "https://github.com/Kryptortio/SDAtom-WebUi-us#prompt-filter", type: 'json', value: ''},
+		filterNeg: {name: "Filter negative prompt", description: "Apply the prompt filter to the negative filter as well", type: 'bool', value: false},
+		autoscroll: {name: "Autoscroll console", description: "Scroll console automatically when new lines appear", type: 'bool', value: true},
+		verbose: {name: "Verbose console", description: "Log as much as possible to the console", type: 'bool', value: false},
+		maxQueue: {name: "Max queue items", description: "Max items to retain in the queue before deleting them, oldest-first", type: 'int', value: 20, min: 1},
+		maxLines: {name: "Max console lines", description: "Maximum lines to retrain in the console box", type: 'int', value: 500, min: 1},
+		A1: {name: "Alt 1 override", ...AltOpts, value: {width:768, height:768}},
+		A2: {name: "Alt 2 override", ...AltOpts, value: {width:1024, height:1024}},
+		A3: {name: "Alt 3 override", ...AltOpts, value: {sample:20, sampleMethod:"Euler a", width:512, height:512, restoreFace:false, tiling:false,
+			batchCount:1, batchSize:1, cfg:7, seed:-1, extra:false, varSeed:-1, varStr:0}},
+		opacity: {name: "Button transparency", description: "Adjust opacity of the floating queue buttons", type: 'range', value: .7}
 	},
-	savedSetting: JSON.parse(localStorage.awqSavedSetting || '{}'),
-	currentQueue: JSON.parse(localStorage.awqCurrentQueue || '[]'),
+	presets: JSON.parse(localStorage.awqPresets || '{}'),
+	savedQueue: JSON.parse(localStorage.awqQueue || '[]')
 }
 
-if(localStorage.hasOwnProperty("awqNotificationSound") && !localStorage.hasOwnProperty("awqScriptSettings")) { //Tmp settings migration
-	awqDebug('Copying settings from old storage');
-	if(localStorage.hasOwnProperty("awqNotificationSound"))
-		conf.scriptSettings.notificationSound.value = localStorage.awqNotificationSound == 1;
-	if(localStorage.hasOwnProperty("awqAutoscrollOutput"))
-		conf.scriptSettings.autoscrollOutput.value = localStorage.awqAutoscrollOutput == 1;
-	if(localStorage.hasOwnProperty("awqVerboseLog"))
-		conf.scriptSettings.verboseLog.value = localStorage.awqVerboseLog == 1;
-	if(localStorage.hasOwnProperty("awqMaxOutputLines"))
-		conf.scriptSettings.maxOutputLines.value = localStorage.awqMaxOutputLines;
-	if(localStorage.hasOwnProperty("awqPromptFilter"))
-		conf.scriptSettings.promptFilter.value = localStorage.awqPromptFilter;
-	if(localStorage.hasOwnProperty("awqExtensionScript"))
-		conf.scriptSettings.extensionScript.value = localStorage.awqExtensionScript;
-}
-
-const c_wait_tick_duration = 200,
-c_any_value = "<ANY VALUE>",
-c_emptyQueueString = "Queue is empty",
-c_addQueueText = "Add to queue",
-c_addQueueDesc = "Add an item to the queue according to current tab and settings",
-c_addQueueDescAlt = c_addQueueDesc+" and overwrite with Alt ",
-c_processButtonText = "Process Queue",
-c_defaultTextStoredSettings = "Stored settings",
-c_audio_base64 = new Audio('data:audio/mpeg;base64,//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVR9DU02wxI2HBY0xzzTPHVjsaEggIYbBQymbZ5et+lSLLDAPL2LcegkDNlkiLYgIBgMoIRxodnFVNMu2pmYwSfDSC2CxTFDKowcoycCimGKGFhYRCx50EjDS05dCEXJaIRTRHMTQfkO/U/sjuSEa5wroVM0a2hmXr0oA7JasD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V///+YGDIYDB4HGBRAYjCABAQMAOrVXeNb/////QYBwSBIETHQhBgBRAMGgq1lV3jW13f//////ogl+UTWeJbqBIMiQBa6X2STL/Y1tdq75lrtXf///////44AURAYAVhE+lMmFrcRNYQqJhyhq4FhWjY1tdx/mWu475lrv//////////rTVMnql4XBZApWX+aWuRL1jSmZf5pbEEvXQWDS+Z+yzHfK2u1d8y12rtFKTRUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAOAAAAAAA0gBwAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+const DoneAudio = new Audio('data:audio/mpeg;base64,//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVR9DU02wxI2HBY0xzzTPHVjsaEggIYbBQymbZ5et+lSLLDAPL2LcegkDNlkiLYgIBgMoIRxodnFVNMu2pmYwSfDSC2CxTFDKowcoycCimGKGFhYRCx50EjDS05dCEXJaIRTRHMTQfkO/U/sjuSEa5wroVM0a2hmXr0oA7JasD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V///+YGDIYDB4HGBRAYjCABAQMAOrVXeNb/////QYBwSBIETHQhBgBRAMGgq1lV3jW13f//////ogl+UTWeJbqBIMiQBa6X2STL/Y1tdq75lrtXf///////44AURAYAVhE+lMmFrcRNYQqJhyhq4FhWjY1tdx/mWu475lrv//////////rTVMnql4XBZApWX+aWuRL1jSmZf5pbEEvXQWDS+Z+yzHfK2u1d8y12rtFKTRUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PkZAAAAAGkAOAAAAAAA0gBwAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
 
 //----------------------------------------------------------------------------- Logging
 function preAwqLog(msg) {console.info(`SDAtom-WebUi-us: ${msg}`)}
 function awqDebug(msg, force) {awqLog(msg, 0, 1, force)}
 function awqErr(msg) {awqLog(msg, 'red')}
 function awqLog(msg, color, isDbg, force) {
-	if(!conf.ui.msgConsole) return preAwqLog(msg);
-	if(isDbg && !(force || conf.scriptSettings.verboseLog.value)) return;
+	if(!Conf.ui.msgConsole) return preAwqLog(msg);
+	if(isDbg && !(force || Conf.settings.verbose.value)) return;
 	let ts = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
-	msg = utils.mkEl(isDbg?'span':'div', conf.ui.msgConsole, null, null, `${ts}: ${msg}`);
+	msg = utils.mkEl(isDbg?'span':'div', Conf.ui.msgConsole, null, null, `${ts}: ${msg}`);
 	if(color) msg.style.color = color;
-	if(conf.ui.msgConsole.childElementCount >= conf.scriptSettings.maxOutputLines.value) conf.ui.msgConsole.firstChild.remove();
-	if(conf.scriptSettings.autoscrollOutput.value) conf.ui.msgConsole.scrollTo(0, conf.ui.msgConsole.scrollHeight);
+	if(Conf.ui.msgConsole.childElementCount >= Conf.settings.maxLines.value) Conf.ui.msgConsole.firstChild.remove();
+	if(Conf.settings.autoscroll.value) Conf.ui.msgConsole.scrollTo(0, Conf.ui.msgConsole.scrollHeight);
 }
 
 //----------------------------------------------------------------------------- Wait for content to load
-let waitForLoadInterval = setInterval(initAWQ, c_wait_tick_duration);
+let waitForLoadInterval = setInterval(initAWQ, TickDelay);
 function initAWQ() {
-	conf.shadowDOM.root = document.querySelector(conf.shadowDOM.sel);
-	if(!conf.shadowDOM.root || !conf.shadowDOM.root.querySelector('#txt2img_prompt')) return;
+	Conf.shadowDOM.root = document.querySelector(Conf.shadowDOM.sel);
+	if(!Conf.shadowDOM.root || !Conf.shadowDOM.root.querySelector('#txt2img_prompt')) return;
 	clearInterval(waitForLoadInterval);
 
-	conf.commonData.versionContainer.el = conf.shadowDOM.root.querySelector('#footer .versions');
+	Conf.common.versionContainer.el = Conf.shadowDOM.root.querySelector('#footer .versions');
 
 	//Check for extensions
-	for(let ext in conf.extensions) {
-		if(!document.querySelector(conf.extensions[ext].existCheck.sel)) {
-			preAwqLog(`Extension ${conf.extensions[ext].name} not found, disabling`);
-			conf.extensions[ext] = false;
+	for(let ext in Conf.extensions) {
+		if(!document.querySelector(Conf.extensions[ext].existCheck.sel)) {
+			preAwqLog(`Extension ${Conf.extensions[ext].name} not found, disabling`);
+			Conf.extensions[ext] = false;
 		} else {
-			preAwqLog(`Extension ${conf.extensions[ext].name} found`);
+			preAwqLog(`Extension ${Conf.extensions[ext].name} found`);
 		}
 	}
 
-	mapElementsToConf(conf.commonData, 'main object');
-	mapElementsToConf(conf.t2i, 't2i object');
-	mapElementsToConf(conf.t2i.controls, 't2i control');
-	mapElementsToConf(conf.i2i, 'i2i object');
-	mapElementsToConf(conf.i2i.controls, 'i2i control');
-	mapElementsToConf(conf.ext, 'ext object');
-	mapElementsToConf(conf.ext.controls, 'ext control');
-	if(conf.extensions.iBrowser) waitForElm(conf.extensions.iBrowser.guiElems.txt2img.sel)
-		.then(() => mapElementsToConf(conf.extensions.iBrowser.guiElems, 'iBrowser objects'));
+	mapElementsToConf(Conf.common, 'main object');
+	mapElementsToConf(Conf.t2i, 't2i object');
+	mapElementsToConf(Conf.t2i.controls, 't2i control');
+	mapElementsToConf(Conf.i2i, 'i2i object');
+	mapElementsToConf(Conf.i2i.controls, 'i2i control');
+	mapElementsToConf(Conf.ext, 'ext object');
+	mapElementsToConf(Conf.ext.controls, 'ext control');
+	if(Conf.extensions.iBrowser) waitForElm(Conf.extensions.iBrowser.guiElems.txt2img.sel)
+		.then(() => mapElementsToConf(Conf.extensions.iBrowser.guiElems, 'iBrowser objects'));
 
 	loadScriptSettings();
 	generateMainUI();
 
-	try {eval(conf.scriptSettings.extensionScript.value)} catch(e) {awqLog(`Failed to load extension script, error: <pre>${
-		e.message} l:${e.lineNumber} c:${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
+	try {eval(Conf.settings.extensionScript.value)} catch(e) {awqLog(`Failed to load extension script, error: <pre>${
+		e.message} l=${e.lineNumber} c=${e.columnNumber}\n${e.stack}</pre>`, 'darkorange')}
 
-	setInterval(updateStatus, c_wait_tick_duration);
+	setInterval(updateStatus, TickDelay);
 }
 
-function mapElementsToConf(p_object, p_info) {
-	for(let prop in p_object) {
-		if(p_object[prop].sel) {
-			p_object[prop].el = conf.shadowDOM.root.querySelector(p_object[prop].sel);
-			if(!p_object[prop].el) awqErr(`Failed to find the ${p_info} ${prop}`);
+function mapElementsToConf(object, info) {
+	for(let prop in object) {
+		if(object[prop].sel) {
+			object[prop].el = Conf.shadowDOM.root.querySelector(object[prop].sel);
+			if(!object[prop].el) awqErr(`Failed to find the ${info} ${prop}`);
 		}
-		if(p_object[prop].sel2) {
-			p_object[prop].el2 = conf.shadowDOM.root.querySelector(p_object[prop].sel2);
-			if(!p_object[prop].el2) awqErr(`Failed to find the secondary ${p_info} ${prop}`);
+		if(object[prop].sel2) {
+			object[prop].el2 = Conf.shadowDOM.root.querySelector(object[prop].sel2);
+			if(!object[prop].el2) awqErr(`Failed to find the secondary ${info} ${prop}`);
 		}
-		if(p_object[prop].grad) {
-			let gradIndex = p_object[prop].gradIndex ? p_object[prop].gradIndex : 0;
-			p_object[prop].gradEl = findGradioComponentState(p_object[prop].grad)[gradIndex];
-			if(!p_object[prop].gradEl) awqErr(`Failed to find the gradio element ${p_info} ${prop}`);
+		if(object[prop].grad) {
+			let gradIndex = object[prop].gradIndex ? object[prop].gradIndex : 0;
+			object[prop].gradEl = findGradioComponentState(object[prop].grad)[gradIndex];
+			if(!object[prop].gradEl) awqErr(`Failed to find the gradio element ${info} ${prop}`);
 		}
-		if(p_object[prop].gradLab) {
-			p_object[prop].gradEl = findGradioComponentStateByLabel(p_object[prop].gradLab)[0];
-			if(!p_object[prop].gradEl) awqErr(`Failed to find the gradio element ${p_info} ${prop}`);
+		if(object[prop].gradLab) {
+			object[prop].gradEl = findGradioComponentStateByLabel(object[prop].gradLab)[0];
+			if(!object[prop].gradEl) awqErr(`Failed to find the gradio element ${info} ${prop}`);
 		}
 	}
 }
 
 function appendQueueBtn(parent, name, onclick, tip) {
-	let btn = utils.mkEl('button', parent, null, null, name);
+	let btn = Conf.ui[name] = utils.mkEl('button', parent, null, null, name);
 	btn.onclick = onclick, btn.title = tip;
 	return btn;
+}
+
+//Respond to shortcut keys
+onkeyup = e => {
+	if(e.altKey && !e.ctrlKey) {
+		let key = e.key, el;
+		if(key == 'w') el = Conf.ui.processBtn;
+		else if(key == 'c') el = Conf.ui.clearBtn;
+		else if(key == 'q') el = Conf.ui[AddQueueTxt];
+		else if(Number(key)) el = Conf.ui['A'+key];
+		if(el) el.onclick();
+	}
 }
 
 function generateMainUI() {
@@ -463,8 +430,10 @@ function generateMainUI() {
 	font-size:100%; appearance:auto;
 	scrollbar-width:thin;
 }
+.AWQ-box input::placeholder, .awq-popup input::placeholder,
+.awq-popup textarea::placeholder { color:#777; }
 .awq-popup :not(button) { color:var(--block-title-text-color); }
-.awq-popup, .awq-popup * { box-sizing:border-box; }
+.awq-popup, .awq-popup *, .awq-json-editor, .awq-json-editor > * { box-sizing:border-box; }
 .awq-popup {
 	position:fixed; top:0; left:0; width:100%; height:100%;
 	padding:50px 0; z-index:9999; overflow-y:auto;
@@ -485,9 +454,21 @@ function generateMainUI() {
 }
 .awq-popup input:not([type=checkbox]), .awq-popup textarea { width:100%; margin:0; }
 .awq-popup input[type=checkbox] { vertical-align:middle; margin:0 5px; }
+.awq-popup input[type=range] { padding:0; }
 .awq-popup button { margin:5px 0; }
 .awq-popup button:last-child { margin-bottom:0; }
 .awq-popup textarea { min-height:60px; resize:vertical; }
+
+.awq-json-editor {
+	position:fixed; top:0; left:0; width:100vw; height:100vh;
+	display:flex; flex-direction:column; gap:3px; padding:3px;
+	z-index:9999; background:#000;
+}
+.awq-json-editor > * { width:100%; padding:5px; }
+.awq-json-editor input { font-size:24px; }
+.awq-json-editor textarea { resize:none; flex-grow:1; }
+.awq-json-editor > div { display:flex; gap:3px; padding:0; }
+.awq-json-editor button { height:30px; flex-grow:1; }
 
 .AWQ-box button, .AWQ-overlay button, .awq-popup button {
 	display:inline-block; height:25px; cursor:pointer;
@@ -497,7 +478,10 @@ function generateMainUI() {
 	border-radius:var(--input-radius);
 	margin-right:5px; padding: 0 5px;
 }
-.AWQ-console > div { height:auto; margin:0; padding:2px; border-radius:unset; }
+.AWQ-console > div {
+	height:auto; margin:0; padding:2px;
+	border-radius:unset; overflow-wrap:anywhere;
+}
 .AWQ-console > span { display:block; padding:2px; color:darkgray; }
 .AWQ-box input.completed-queue-item {
 	background:var(--button-secondary-background-fill);
@@ -532,121 +516,121 @@ function generateMainUI() {
 	let msgBox = utils.mkDiv(null, 'AWQ-box block gradio-accordion'),
 	tabs = document.querySelector('#tabs');
 	tabs.parentElement.insertBefore(msgBox, tabs.nextElementSibling);
-	conf.ui.msgBox = msgBox;
+	Conf.ui.msgBox = msgBox;
 
-	let overlay = utils.mkDiv(document.body, 'AWQ-overlay', {opacity:conf.scriptSettings.buttonOpacity.value});
-	conf.ui.overlay = overlay;
+	let overlay = utils.mkDiv(document.body, 'AWQ-overlay', {opacity:Conf.settings.opacity.value});
+	Conf.ui.overlay = overlay;
 
-	appendQueueBtn(overlay, c_addQueueText, appendQueueItem, c_addQueueDesc);
+	appendQueueBtn(overlay, AddQueueTxt, appendQueueItem, AddQueueDesc);
 	let qbCont = utils.mkDiv(overlay);
-	appendQueueBtn(qbCont, 'A1', () => appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings1.value)), c_addQueueDescAlt+1);
-	appendQueueBtn(qbCont, 'A2', () => appendQueueItem(null, null, null, JSON.parse(conf.scriptSetntings.overwriteQueueSettings2.value)), c_addQueueDescAlt+2);
-	appendQueueBtn(qbCont, 'A3', () => appendQueueItem(null, null, null, JSON.parse(conf.scriptSettings.overwriteQueueSettings3.value)), c_addQueueDescAlt+3);
+	appendQueueBtn(qbCont, 'A1', () => appendQueueItem(null, null, Conf.settings.A1.value), AddQueueDescAlt+1);
+	appendQueueBtn(qbCont, 'A2', () => appendQueueItem(null, null, Conf.settings.A2.value), AddQueueDescAlt+2);
+	appendQueueBtn(qbCont, 'A3', () => appendQueueItem(null, null, Conf.settings.A3.value), AddQueueDescAlt+3);
 
 	let defQty = utils.mkEl('input', msgBox, null, {width:'50px'});
 	defQty.type = 'number', defQty.min = 0;
-	defQty.title = "How many items of each will be added to the queue (default is 1)";
-	defQty.value = conf.scriptSettings.defQty.value;
-	defQty.onchange = function() {conf.scriptSettings.defQty.value = this.value}
+	defQty.title = "Default quantity to assign";
+	defQty.value = Conf.settings.defQty.value;
+	defQty.onchange = function() {Conf.settings.defQty.value = this.value}
 	defQty.onfocus = function() {this.select()}
-	conf.ui.defQty = defQty;
+	Conf.ui.defQty = defQty;
 
 	let assignDefVal = utils.mkEl('button', msgBox, null, null, '⤵');
-	assignDefVal.title = "Assign the default value to all queue items";
+	assignDefVal.title = "Assign default quantity to all queue items";
 	assignDefVal.onclick = () => {
-		if(conf.scriptSettings.defQty.value >= 0) {
-			document.querySelectorAll('.AWQ-item-qty').forEach((inp) => {inp.value = conf.scriptSettings.defQty.value});
+		if(Conf.settings.defQty.value >= 0) {
+			document.querySelectorAll('.AWQ-item-qty').forEach((inp) => {
+				inp.value = Conf.settings.defQty.value;
+				inp.onchange();
+			});
 			updateQueueState();
 		}
 	}
 
-	let processBtn = utils.mkEl('button', msgBox, null, null, c_processButtonText);
-	processBtn.title = "Start processing the queue, click again to stop";
+	let processBtn = utils.mkEl('button', msgBox, null, null, ProcessTxt);
+	processBtn.title = "Start/stop queue processing; You can also use ALT + W";
 	processBtn.onclick = () => toggleProcessButton();
-	conf.ui.processBtn = processBtn;
+	Conf.ui.processBtn = processBtn;
 
 	let clearBtn = utils.mkEl('button', msgBox, null, null, "Clear Queue");
-	clearBtn.title = "Empty the queue completely";
+	clearBtn.title = "Erase the queue; You can also use ALT + C";
 	clearBtn.onclick = () => {
-		if(!confirm('Are you sure you want to remove everything in your queue?')) return;
-		conf.ui.queueCont.innerHTML = c_emptyQueueString;
-		let oldQueueLength = conf.currentQueue.length;
-		conf.currentQueue = [];
+		Conf.ui.queueCont.textContent = EmptyQueueTxt;
+		awqLog('Queue cleared');
 		updateQueueState();
-		awqLog(`Queue has been cleared, ${oldQueueLength} items removed`);
 	}
+	Conf.ui.clearBtn = clearBtn;
 
 	let settingsBtn = utils.mkEl('button', msgBox, null, {float:'right', margin:0}, "Settings");
-	settingsBtn.title = "Open the script settings menu";
+	settingsBtn.title = "Open script settings menu";
 	settingsBtn.onclick = openSettings;
 
-	conf.ui.queueCont = utils.mkDiv(msgBox, 'AWQ-queue', null, c_emptyQueueString);
+	Conf.ui.queueCont = utils.mkDiv(msgBox, 'AWQ-queue', null, EmptyQueueTxt);
 
 	let clearSettingsBtn = utils.mkEl('button', msgBox, null, {background:'none'}, '❌');
-	clearSettingsBtn.title = "Remove the currently selected setting";
-	clearSettingsBtn.onclick = clearSetting;
+	clearSettingsBtn.title = "Delete current preset";
+	clearSettingsBtn.onclick = clearPreset;
 
-	let setStore = utils.mkEl('select', msgBox);
-	setStore.title = "List of stored settings (template of all settings)";
-	conf.ui.settingsStorage = setStore;
+	let setList = utils.mkEl('select', msgBox);
+	setList.title = "List of saved presets";
+	Conf.ui.presetList = setList;
 
 	let editBtn = utils.mkEl('button', msgBox, null, null, '✏️');
-	editBtn.title = "Edit the currently selected setting (a property can be removed to not change it when loading)";
-	editBtn.onclick = editSetting;
+	editBtn.title = "Edit current preset";
+	editBtn.onclick = editPreset;
 
 	let loadSettingsBtn = utils.mkEl('button', msgBox, null, null, "Load");
 	loadSettingsBtn.innerHTML = "Load";
-	loadSettingsBtn.title = "Load the currently selected setting (replacing current settings)";
-	loadSettingsBtn.onclick = loadSetting;
+	loadSettingsBtn.title = "Load current preset";
+	loadSettingsBtn.onclick = loadPreset;
 
-	let settingName = utils.mkEl('input', msgBox);
-	settingName.placeholder = "Setting name";
-	settingName.title = "Name to use when saving a new setting (duplicates not allowed)";
-	settingName.onfocus = function() {this.select()}
-	conf.ui.settingName = settingName;
+	let presetName = utils.mkEl('input', msgBox);
+	presetName.placeholder = "Preset name";
+	presetName.title = "Name for the new preset";
+	presetName.onfocus = function() {this.select()}
+	Conf.ui.presetName = presetName;
 
 	let saveBtn = utils.mkEl('button', msgBox, null, null, "Save");
-	saveBtn.title = "Save currently selected settings so that you can load them again later";
-	saveBtn.onclick = saveSettings;
+	saveBtn.title = "Save a new preset w/ current prompt and settings";
+	saveBtn.onclick = addPreset;
 
-	conf.ui.msgConsole = utils.mkDiv(msgBox, 'AWQ-console');
-	awqDebug(`* Running SDAtom-WebUi-us version ${c_scriptVersion} using ${c_scriptHandeler} with browser ${
-		navigator.userAgent} <span style="font-size:.9em">WebUI ${conf.commonData.versionContainer.el.textContent}`, true);
+	Conf.ui.msgConsole = utils.mkDiv(msgBox, 'AWQ-console');
+	awqDebug(`* Running SDAtom-WebUi-us version ${Ver} using ${Handler} with browser ${
+		navigator.userAgent} <span style="font-size:.9em">WebUI ${Conf.common.versionContainer.el.textContent}`, true);
 	let msgClearBtn = utils.mkEl('button', msgBox, null, null, "Clear");
 	msgClearBtn.title = "Clear the console";
-	msgClearBtn.onclick = () => {conf.ui.msgConsole.textContent = ''}
+	msgClearBtn.onclick = () => {Conf.ui.msgConsole.textContent = ''}
 
 	document.querySelector('.gradio-container').style.overflow = 'visible'; //Fix so that a dropdown menu can overlap the queue
-	refreshSettings();
+	refreshPresets();
 
-	if(conf.currentQueue.length > 0) {
-		awqDebug(`Loaded saved queue:${conf.currentQueue.length}`);
-		for(let i = 0; i < conf.currentQueue.length; ++i)
-			appendQueueItem(conf.currentQueue[i].qty, conf.currentQueue[i].value, conf.currentQueue[i].type);
-		updateQueueState();
+	if(Conf.savedQueue.length > 0) {
+		awqDebug(`Loaded saved queue ${Conf.savedQueue.length}`);
+		for(let i = 0, q; i < Conf.savedQueue.length; ++i) {
+			q = Conf.savedQueue[i], appendQueueItem(q.qty, q.data);
+		}
+		delete Conf.savedQueue; //Will be regenerated as needed
 	}
 	awqDebug('generateMainUI: Completed');
 }
 
-function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
-	awqDebug(`appendQueueItem: qty:${p_qty} type:${p_type}`);
-
-	if(conf.ui.queueCont.innerHTML == c_emptyQueueString) conf.ui.queueCont.textContent = '';
-	let queueItm = utils.mkDiv(conf.ui.queueCont),
-	qty = isNaN(p_qty) || p_qty == null ?
-		(parseInt(conf.ui.defQty.value) > 0 ?
-		parseInt(conf.ui.defQty.value) : 1) : p_qty;
+function appendQueueItem(qty, data, override) {
+	awqDebug(`appendQueueItem ${qty}x`);
+	if(!Conf.ui.queueCont.firstChild.tagName) Conf.ui.queueCont.textContent = '';
+	if(Conf.ui.queueCont.childElementCount >= Conf.settings.maxQueue.value) Conf.ui.queueCont.firstChild.remove();
+	let queueItm = utils.mkDiv(Conf.ui.queueCont), setQty = Number(Conf.ui.defQty.value);
+	setQty = Number.isFinite(qty) ? qty : setQty > 0 ? setQty : 1;
 
 	let delItm = utils.mkEl('button', queueItm, null, {background:'none'}, '❌');
-	delItm.title = "Remove this item from the queue";
+	delItm.title = "Remove from the queue";
 	delItm.onclick = () => {queueItm.remove(); updateQueueState()}
 
 	let moveUp = utils.mkEl('button', queueItm, null, null, '⇧');
-	moveUp.title = "Move this item up in the queue";
+	moveUp.title = "Move up in the queue";
 	moveUp.onclick = () => {
 		let prevItm = queueItm.previousSibling;
 		if(prevItm) {
-			conf.ui.queueCont.insertBefore(queueItm, prevItm);
+			Conf.ui.queueCont.insertBefore(queueItm, prevItm);
 			updateQueueState();
 		}
 	}
@@ -656,7 +640,7 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 	moveDown.onclick = () => {
 		let nextItm = queueItm.nextSibling;
 		if(nextItm) {
-			conf.ui.queueCont.insertBefore(nextItm, queueItm);
+			Conf.ui.queueCont.insertBefore(nextItm, queueItm);
 			updateQueueState();
 		}
 	}
@@ -664,9 +648,9 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 	let moveToBtm = utils.mkEl('button', queueItm, null, null, '⤓');
 	moveToBtm.title = "Move to the bottom of the queue";
 	moveToBtm.onclick = () => {
-		let lastItm = conf.ui.queueCont.lastChild;
+		let lastItm = Conf.ui.queueCont.lastChild;
 		if(lastItm.lastChild !== queueItm) {
-			conf.ui.queueCont.appendChild(queueItm);
+			Conf.ui.queueCont.appendChild(queueItm);
 			updateQueueState();
 		}
 	}
@@ -674,25 +658,25 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 	let moveToTop = utils.mkEl('button', queueItm, null, null, '⤒');
 	moveToTop.title = "Move to the top of the queue";
 	moveToTop.onclick = () => {
-		let firstItm = conf.ui.queueCont.firstChild;
+		let firstItm = Conf.ui.queueCont.firstChild;
 		if(firstItm && firstItm !== queueItm) {
-			conf.ui.queueCont.insertBefore(queueItm, firstItm);
+			Conf.ui.queueCont.insertBefore(queueItm, firstItm);
 			updateQueueState();
 		}
 	}
 
 	let loadItem = utils.mkEl('button', queueItm, null, null, "Load");
-	loadItem.title = "Load the settings from this item";
-	loadItem.onclick = () => loadJson(itemJSON.value);
+	loadItem.title = "Load presets from this item";
+	loadItem.onclick = () => loadJSON(itemJSON._json);
 
 	let itemType = utils.mkEl('input', queueItm, 'AWQ-item-type');
-	itemType.title = "This is the type/tab for the queue item";
+	itemType.title = "Type/tab for queue item";
 	itemType.disabled = true;
 
 	let itemQty = utils.mkEl('input', queueItm, 'AWQ-item-qty');
 	itemQty.type = 'number', itemQty.min = 0;
-	itemQty.title = "This is how many times this item should be executed";
-	itemQty.value = qty;
+	itemQty.title = "How many times the task should be executed";
+	itemQty.value = setQty;
 	function updateItemQtyBG() {
 		if(itemQty.value.length == 0) itemQty.style.color = 'red';
 		else if(itemQty.value < 1) itemQty.style.color = 'rgb(0, 225, 0)', itemQty.classList.add('completed-queue-item');
@@ -703,45 +687,69 @@ function appendQueueItem(p_qty, p_value, p_type, p_overwrite_data) {
 	updateItemQtyBG();
 
 	let itemJSON = utils.mkEl('input', queueItm, 'AWQ-item-JSON');
-	itemJSON.title = "This is a JSON string with all the settings to be used for this item. Can be changed while processing the queue but will fail if you enter invalid values.";
-	itemJSON.value = p_value || getValueJSON(p_type);
-	if(p_overwrite_data) {
-		awqDebug(`appendQueueItem: Adding to queue with Overwriting: ${JSON.stringify(p_overwrite_data)}`);
-		let jsonData = JSON.parse(itemJSON.value);
-		for(let setKey in p_overwrite_data) jsonData[setKey] = p_overwrite_data[setKey];
-		itemJSON.value = JSON.stringify(jsonData);
+	itemJSON.title = "JSON data that defines this queue item's prompt and presets";
+	itemJSON._json = data || getValueJSON();
+	if(override) {
+		awqDebug('appendQueueItem: Adding to queue with override');
+		for(let setKey in override) itemJSON._json[setKey] = override[setKey];
 	}
-	(itemJSON.onchange = () => {
-		updateQueueState();
-		//Update itemType if needed
-		let newType = itemJSON.value.match(/"type":"([^"]+)"/);
-		itemType.value = newType ? newType[1] : null;
+	(itemJSON.onchange = e => {
+		if(e) itemJSON._json = parseJSON(itemJSON.value);
+		if(!itemJSON._json) {
+			awqErr('Failed to parse JSON data');
+			itemJSON._json = '';
+			return;
+		}
+		itemJSON.value = JSON.stringify(itemJSON._json);
+		itemType.value = itemJSON._json.type || '?'; //Update itemType
+		if(e) updateQueueState();
 	})();
 
-	awqLog(`Added new ${itemType.value} queue item (${qty}x)`);
+	awqLog(`Added new ${itemType.value} queue item (${setQty}x)`);
 	//Wait with updating state while loading a predefined queue
-	if(isNaN(p_qty)) updateQueueState();
+	if(isNaN(qty)) updateQueueState();
 }
 
 function saveScriptSettings() {
 	awqDebug('Saving script settings');
-	let scriptSettingsCopy = structuredClone(conf.scriptSettings);
-
-	//Delete data that does not need to be saved
-	for(let ssk in scriptSettingsCopy) for(let ssk2 in scriptSettingsCopy[ssk])
-		if(ssk2 != 'value') delete scriptSettingsCopy[ssk][ssk2];
-
-	conf.ui.defQty.value = conf.scriptSettings.defQty.value; //Update beacuse this one is in two places
-	localStorage.awqScriptSettings = JSON.stringify(scriptSettingsCopy);
+	let settings = {}, sk, data, val;
+	function sErr(e) {e=`Bad value for ${data.name}: ${e}`; alert(e); throw e}
+	for(sk in Conf.settings) {
+		data = Conf.settings[sk], val = data.value;
+		//Validate
+		switch(data.type) {
+		case 'int':
+			val = Number(val);
+			if(!Number.isSafeInteger(val)) return sErr("Not an int");
+			if(data.min != null && val < data.min) return sErr("Less than "+data.min);
+			break;
+		case 'range':
+			val = Number(val);
+			if(!Number.isFinite(val)) return sErr("Not a number");
+			break;
+		case 'bool':
+			if(typeof val !== 'boolean') return sErr("Not a boolean");
+			break;
+		case 'json':
+			if(typeof val !== 'object') {
+				if(val) {
+					val = parseJSON(val);
+					if(!val) return sErr("Invalid JSON");
+				} else val = '';
+			}
+		}
+		settings[sk] = data.value = val;
+	}
+	Conf.ui.defQty.value = Conf.settings.defQty.value; //Update beacuse this one is in two places
+	if(!Conf.settings.rememberQueue.value) localStorage.removeItem('awqQueue');
+	localStorage.awqSettings = JSON.stringify(settings);
 }
-
-function loadScriptSettings(p_scriptSettings) {
-	if(!localStorage.hasOwnProperty("awqScriptSettings") || !isJsonString(localStorage.awqScriptSettings)) return;
-	awqDebug('Loding saved script settings');
-
-	let savedSettings = p_scriptSettings || JSON.parse(localStorage.awqScriptSettings);
-	for(let ssk in conf.scriptSettings) if(savedSettings.hasOwnProperty(ssk))
-		conf.scriptSettings[ssk].value = savedSettings[ssk].value;
+function loadScriptSettings() {
+	if('awqSettings' in localStorage) try {
+		awqDebug('Loding saved script settings');
+		let settings = JSON.parse(localStorage.awqSettings);
+		for(let sk in Conf.settings) if(sk in settings) Conf.settings[sk].value = settings[sk];
+	} catch(e) {awqErr('Failed to load settings, will reset')}
 }
 
 function openSettings() {
@@ -751,42 +759,54 @@ function openSettings() {
 	utils.mkDiv(hdr, null, null, "<b>SDAtom Settings</b> - <i>Hold your mouse over an item for a description</i>");
 	let close = utils.mkDiv(hdr, null, {float:'right', textShadow:'#292929 2px 3px 5px', cursor:'pointer'}, '⛌');
 	close.onclick = () => {
+		saveScriptSettings();
 		document.body.style.overflow = '';
 		dialog.parentElement.remove();
-		saveScriptSettings();
 	}
 
 	//Create input for each script setting
-	for(let ssKey in conf.scriptSettings) {
-		let ssObj = conf.scriptSettings[ssKey],
+	for(let key in Conf.settings) {
+		let data = Conf.settings[key],
 		ssCont = utils.mkDiv(body),
-		ssElem = utils.mkEl(ssObj.type=='text'?'textarea':'input');
-		ssElem.id = 'awq-ss-' + ssKey;
-		ssElem.placeholder = ssObj.name;
-		ssElem.value = ssObj.value;
+		ssElem = utils.mkEl(data.type=='text'||data.type=='json' ? 'textarea' : 'input');
+		ssElem.id = 'awq-ss-' + key;
+		ssElem.placeholder = data.name;
 		ssElem.onchange = function() {
-			conf.scriptSettings[ssKey].value = ssObj.type == 'boolean' ? this.checked : this.value;
-			saveScriptSettings();
+			Conf.settings[key].value = data.type=='bool' ? this.checked : this.value;
 		}
 
-		if(ssObj.type == 'boolean') {
+		switch(data.type) {
+		case 'bool':
 			ssElem.type = 'checkbox';
-			ssElem.checked = ssObj.value;
-		} else if(ssObj.type == 'numeric') {
-			ssElem.type = 'number', ssElem.inputmode = 'numeric';
-			ssElem.onkeypress = e => {if(e.key.match(/\D/g)) e.preventDefault()}
+			ssElem.checked = data.value;
+			break;
+		case 'int':
+			ssElem.type = 'number', ssElem.step = 1;
+			if(data.min != null) ssElem.min = data.min;
+			ssElem.value = data.value;
+			break;
+		case 'range':
+			ssElem.type = 'range';
+			ssElem.min = 0, ssElem.max = 1, ssElem.step = .1;
+			ssElem.value = data.value;
+			break;
+		case 'json':
+			if(data.value) ssElem.value = JSON.stringify(data.value);
+			break;
+		default:
+			ssElem.value = data.value;
 		}
 
-		let cbLabel = utils.mkEl('label', ssCont, null, null, ssObj.name);
-		cbLabel.for = ssElem.id, cbLabel.title = ssObj.description;
+		let cbLabel = utils.mkEl('label', ssCont, null, null, data.name);
+		cbLabel.for = ssElem.id, cbLabel.title = data.description;
 
-		if(ssObj.description.match("http")) {
+		if(data.description.match("http")) {
 			let helpLink = utils.mkEl('a', ssCont, null, {textDecoration:'none'}, '❓');
 			helpLink.target = '_blank';
-			helpLink.href = ssObj.description;
-			ssElem.title = ssObj.name;
+			helpLink.href = data.description;
+			ssElem.title = data.name;
 		} else {
-			ssElem.title = ssObj.description;
+			ssElem.title = data.description;
 		}
 		ssCont.appendChild(ssElem);
 	}
@@ -806,206 +826,183 @@ function openSettings() {
 	repLabel.title = "Search for values in the queue and replace them with something else";
 
 	//Fetch all attributes and values currently in queue
-	let foundAttrs = {}, attrOpts = [];
-	conf.currentQueue.map(el => {
-		let queueData = JSON.parse(el.value);
-		for(let key in queueData) {
-			if(!foundAttrs[key]) foundAttrs[key] = {};
-			foundAttrs[key][queueData[key]] = '';
-		}
-	});
-	gradio_config.components.forEach(el => {
-		if(el.props && el.props.choices) attrOpts.push(el.props.choices);
+	let allAttrs = {};
+	getCurrentQueue().forEach(el => {
+		for(let key in el.data) (allAttrs[key]||(allAttrs[key]=[])).push(el.data[key]);
 	});
 
 	utils.mkEl('label', replacer, null, null, "Attribute");
 	let repAttr = utils.mkEl('input', replacer);
-	repAttr.type = 'text', repAttr.placeholder = '▼';
+	repAttr.type = 'text';
 	repAttr.setAttribute('list', 'awq-rep-attrs');
 	repAttr.onfocus = () => repAttr.select();
 	let repAttrData = utils.mkEl('datalist', replacer),
 	anyOption = utils.mkEl('option', repAttrData);
-	repAttrData.id = 'awq-rep-attrs', anyOption.value = c_any_value;
-	for(let key in foundAttrs) utils.mkEl('option', repAttrData).value = key;
+	repAttrData.id = 'awq-rep-attrs', anyOption.value = AnyValue;
+	for(let key in allAttrs) utils.mkEl('option', repAttrData).value = key;
 
 	utils.mkEl('label', replacer, null, null, "Old value");
 	let repVal = utils.mkEl('input', replacer);
-	repVal.type = 'text', repVal.placeholder = '▼';
+	repVal.type = 'text';
 	repVal.setAttribute('list', 'awq-rep-vals');
 	repVal.onfocus = () => repVal.select();
 	let repValData = utils.mkEl('datalist', replacer);
 	repValData.id = 'awq-rep-vals';
 
-	console.log(foundAttrs, attrOpts);
-
 	//Update repValData
+	function addRepVals(vals) {
+		for(let v of vals) utils.mkEl('option', repValData).value = v;
+	}
 	(repAttr.onchange = () => {
-		let foundValues = foundAttrs[repAttr.value];
+		let foundVals = allAttrs[repAttr.value];
 		repValData.textContent = '';
 		repValData.appendChild(anyOption.cloneNode());
-		if(foundValues) {
-			//Add all possible values for currently selected attribute
-			for(let key in foundAttrs) utils.mkEl('option', repValData).value = key;
-		} else {
-			for(let key in foundAttrs) for(let subKey in foundAttrs[key])
-				utils.mkEl('option', repValData).value = subKey;
-		}
+		if(foundVals) addRepVals(foundVals); //Add vals for only currently selected
+		else for(let k in allAttrs) addRepVals(allAttrs[k]);
 	})();
 
 	utils.mkEl('label', replacer, null, null, "New value");
 	let repNewVal = utils.mkEl('input', replacer);
-	repNewVal.type = 'text', repNewVal.placeholder = '▼';
+	repNewVal.type = 'text';
 	repNewVal.setAttribute('list', 'awq-rep-vals');
 	repNewVal.onfocus = () => repNewVal.select();
 
 	let repBtn = utils.mkEl('button', replacer, null, null, "Replace");
 	repBtn.onclick = () => {
 		let attributeValue = repAttr.value,
-		anyAttribute = attributeValue == c_any_value,
+		anyAttribute = attributeValue == AnyValue,
 		oldValue = repVal.value,
-		anyOldValue = oldValue == c_any_value,
-		currentQueue = conf.currentQueue,
+		anyOldValue = oldValue == AnyValue,
+		queue = Conf.ui.queueCont.getElementsByTagName('div'),
 		newValue = repNewVal.value;
 
-		for(let key in currentQueue) { //Loop queue entries
-			let queueElentry = JSON.parse(currentQueue[key].value);
+		for(let el of queue) {
+			el = el.querySelector('.AWQ-item-JSON');
+			let data = el._json;
 			if(anyAttribute) {
-				for(let subKey in queueElentry) { //Loop queue entry attributes
+				for(let subKey in data) { //Loop queue entry attributes
 					if(anyOldValue) {
 						//Replace everything with the new value (why are you doing this?)
-						if(newValue != queueElentry[subKey]) awqDebug(`replaceButton: updated queue item ${key} attribute ${subKey} to ${newValue}`);
-						queueElentry[subKey] = newValue;
+						if(newValue != data[subKey]) awqDebug(`replaceButton: updated queue item ${key} attribute ${subKey} to ${newValue}`);
+						data[subKey] = newValue;
 					} else {
 						//Search and replace in all attributes
-						let replacedValue = queueElentry[subKey].replaceAll ? queueElentry[subKey].replaceAll(oldValue, newValue) : queueElentry[subKey];
-						if(replacedValue != queueElentry[subKey]) awqDebug(`replaceButton: updated queue item ${key} attribute ${subKey} to ${replacedValue}`);
-						queueElentry[subKey] = replacedValue;
+						let replacedValue = data[subKey].replaceAll ? data[subKey].replaceAll(oldValue, newValue) : data[subKey];
+						if(replacedValue != data[subKey]) awqDebug(`replaceButton: updated queue item ${key} attribute ${subKey} to ${replacedValue}`);
+						data[subKey] = replacedValue;
 					}
 				}
 			} else if(anyOldValue) {
 				//Replace all values for this attribute
-				if(newValue != queueElentry[attributeValue]) awqDebug(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
-				queueElentry[attributeValue] = newValue;
+				if(newValue != data[attributeValue]) awqDebug(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${newValue}`);
+				data[attributeValue] = newValue;
 			} else {
 				//Replace string in specific attribute
-				let replacedValue = queueElentry[attributeValue].replaceAll(oldValue, newValue);
-				if(replacedValue != queueElentry[attributeValue]) awqDebug(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
-				queueElentry[attributeValue] = replacedValue;
+				let replacedValue = data[attributeValue].replaceAll(oldValue, newValue);
+				if(replacedValue != data[attributeValue]) awqDebug(`replaceButton: updated queue item ${key} attribute ${attributeValue} to ${replacedValue}`);
+				data[attributeValue] = replacedValue;
 			}
-			currentQueue[key].value = JSON.stringify(queueElentry);
+			el.onchange();
 		}
-
-		//Update state
-		let queueElems = conf.ui.queueCont.querySelectorAll('.AWQ-item-JSON');
-		for(let i = 0; i < currentQueue.length; ++i) queueElems[i].value = currentQueue[i].value;
 		updateQueueState();
 	}
 
 	//Custom code for opacity button
-	let opacityBtn = body.querySelector('#awq-ss-buttonOpacity');
-	opacityBtn.type = 'range';
-	opacityBtn.min = 0, opacityBtn.max = 1, opacityBtn.step = .1;
+	let opacityBtn = body.querySelector('#awq-ss-opacity');
 	opacityBtn.onchange = () => {document.querySelector('.AWQ-overlay').style.opacity =
-		conf.scriptSettings.buttonOpacity.value = opacityBtn.value}
+		Conf.settings.opacity.value = opacityBtn.value}
 }
 
-function toggleProcessButton(p_set_processing) {
-	let oldState = conf.commonData.processing;
-	if(p_set_processing == null) p_set_processing = !oldState;
-	else if(p_set_processing == oldState || conf.scriptSettings.stayReady.value) return;
-	awqDebug(`toggleProcessButton:${p_set_processing}`);
-	let pb = conf.ui.processBtn;
-	if(p_set_processing) {
+function toggleProcessButton(state) {
+	let oldState = Conf.common.processing;
+	if(state == null) state = !oldState;
+	else if(state == oldState || Conf.settings.stayReady.value) return;
+	awqDebug(`toggleProcessButton ${state}`);
+	let pb = Conf.ui.processBtn;
+	if(state) {
 		awqLog('Processing <b>started</b>');
-		conf.commonData.processing = true;
+		Conf.common.processing = true;
 		pb.style.background = 'green', pb.innerHTML = '⏸︎ ';
 		utils.mkDiv(pb, null, {display:'inline-block'}, '⚙️');
 		executeAllNewTasks();
 	} else {
 		awqLog('Processing <b>ended</b>');
-		conf.commonData.processing = conf.commonData.working = false;
-		conf.commonData.previousTaskStartTime = pb.style.background = null;
-		pb.innerHTML = c_processButtonText;
+		Conf.common.processing = Conf.common.working = false;
+		Conf.common.previousTaskStartTime = pb.style.background = null;
+		pb.innerHTML = ProcessTxt;
 	}
 }
 
-function updateQueueState() {
-	let queue = conf.ui.queueCont.getElementsByTagName('div');
-	awqDebug(`updateQueueState: old length:${conf.currentQueue.length} new length:${queue.length}`);
+function getCurrentQueue() {
+	let queue = Conf.ui.queueCont.getElementsByTagName('div'), data = [];
+	for(let q of queue) data.push({
+		qty: Number(q.querySelector('.AWQ-item-qty').value),
+		data: q.querySelector('.AWQ-item-JSON')._json
+	});
+	return data;
+}
 
-	let newArray = [];
-	for(let i = 0; i < queue.length; ++i) {
-		let newRowObject = {};
-		newRowObject.rowid = i;
-		newRowObject.type = queue[i].querySelector('.AWQ-item-type').value;
-		newRowObject.qty = queue[i].querySelector('.AWQ-item-qty').value;
-		newRowObject.value = queue[i].querySelector('.AWQ-item-JSON').value;
-		newArray.push(newRowObject);
-	}
-	conf.currentQueue = newArray;
-	if(conf.scriptSettings.rememberQueue.value) {
-		awqDebug(`updateQueueState: Saving current queue state ${conf.currentQueue.length}`);
-		localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
-	} else {
-		awqDebug('updateQueueState: Cleared current queue state');
-		localStorage.removeItem("awqCurrentQueue");
-	}
+function updateQueueState() {
+	if(Conf.settings.rememberQueue.value) {
+		awqDebug('updateQueueState: Saving current queue state');
+		localStorage.awqQueue = JSON.stringify(getCurrentQueue());
+	} else awqDebug('updateQueueState');
 }
 
 let stuckProcessingCounter = 0;
 function updateStatus() {
 	//Get old & new activeType
-	let previousType = conf.commonData.activeType,
-	newType = conf.commonData.activeType =
-		conf.commonData.i2iContainer.el.style.display !== 'none' ? 'i2i' :
-		conf.commonData.t2iContainer.el.style.display !== 'none' ? 't2i' :
-		conf.commonData.extContainer.el.style.display !== 'none' ? 'ext' :
-		conf.extensions.iBrowser && conf.extensions.iBrowser.guiElems
+	let previousType = Conf.common.activeType,
+	newType = Conf.common.activeType =
+		Conf.common.i2iContainer.el.style.display !== 'none' ? 'i2i' :
+		Conf.common.t2iContainer.el.style.display !== 'none' ? 't2i' :
+		Conf.common.extContainer.el.style.display !== 'none' ? 'ext' :
+		Conf.extensions.iBrowser && Conf.extensions.iBrowser.guiElems
 		.iBrowserContainer.el.style.display !== 'none' ? 'iBrowser' : 'other';
 
 	if(newType !== previousType) {
 		awqDebug(`updateStatus: active type changed to: ${newType}`);
-		conf.ui.overlay.style.display = conf.ui.msgBox.style.display = newType === 'other' ? 'none' : '';
+		Conf.ui.overlay.style.display = Conf.ui.msgBox.style.display = newType === 'other' ? 'none' : '';
 	}
 
-	if(conf.commonData.processing && !conf.commonData.working && !conf.commonData.previousTaskStartTime)
+	if(Conf.common.processing && !Conf.common.working && !Conf.common.previousTaskStartTime)
 		executeAllNewTasks();
 
-	if(conf.commonData.waiting || conf.commonData.working || !conf.commonData.processing)
+	if(Conf.common.waiting || Conf.common.working || !Conf.common.processing)
 		stuckProcessingCounter = 0;
-	else if(!conf.scriptSettings.stayReady.value && ++stuckProcessingCounter > 30) {
+	else if(!Conf.settings.stayReady.value && ++stuckProcessingCounter > 30) {
 		//If no work is being done for a while disable queue
 		awqDebug('updateStatus: stuck in processing queue status? Disabling queue processing');
 		toggleProcessButton(false);
 		stuckProcessingCounter = 0;
-		playWorkCompleteSound();
+		playWorkDoneSound();
 	}
 }
 
 async function executeAllNewTasks() {
-	while(conf.commonData.processing) {
-		if(conf.commonData.working) return; //Already working on task
+	while(Conf.common.processing) {
+		if(Conf.common.working) return; //Already working on task
 
-		if(conf.commonData.previousTaskStartTime) {
-			let timeSpent = Date.now() - conf.commonData.previousTaskStartTime;
+		if(Conf.common.previousTaskStartTime) {
+			let timeSpent = Date.now() - Conf.common.previousTaskStartTime;
 			awqLog(`Completed work on queue item after ${Math.floor(timeSpent / 1000 / 60)} minutes ${
 				Math.round((timeSpent - Math.floor(timeSpent / 60000) * 60000) / 1000)} seconds`);
 		}
 
-		let queue = conf.ui.queueCont.getElementsByTagName('div');
+		let queue = Conf.ui.queueCont.getElementsByTagName('div');
 		for(let i = 0; i < queue.length; ++i) {
 			let itemQty = queue[i].querySelector('.AWQ-item-qty'),
-			itemType = queue[i].querySelector('.AWQ-item-type').value;
-			if(itemQty.value > 0) {
-				awqDebug(`executeNewTask: found next work item with index ${i}, qty ${itemQty.value} and type ${itemType}`);
-				conf.commonData.working = true;
-				await loadJson(queue[i].querySelector('.AWQ-item-JSON').value);
-				await clickStartButton(itemType);
-				itemQty.value = itemQty.value - 1;
-				itemQty.onchange();
-				awqLog(`Started working on ${itemType} queue item ${i + 1} (${itemQty.value} more to go) `);
-				conf.commonData.previousTaskStartTime = Date.now();
-				await waitForTaskToComplete(itemType);
+			qty = Number(itemQty.value);
+			if(qty > 0) {
+				let type = queue[i].querySelector('.AWQ-item-type').value;
+				awqDebug(`executeNewTask: next work i=${i} qty=${qty} type=${type}`);
+				Conf.common.working = true;
+				await loadJSON(queue[i].querySelector('.AWQ-item-JSON')._json);
+				await clickStartButton(type);
+				itemQty.value -= 1, itemQty.onchange();
+				awqLog(`Working on ${type} queue item #${i+1}${qty>1?`(${qty-1} more to go)`:''}`);
+				Conf.common.previousTaskStartTime = Date.now();
+				await waitForTaskToComplete(type);
 				queue = true;
 				break;
 			}
@@ -1013,10 +1010,10 @@ async function executeAllNewTasks() {
 
 		//No more tasks to process
 		if(queue !== true) {
-			if(conf.commonData.previousTaskStartTime) {
-				conf.commonData.previousTaskStartTime = null;
+			if(Conf.common.previousTaskStartTime) {
+				Conf.common.previousTaskStartTime = null;
 				awqDebug('executeNewTask: No more tasks found');
-				playWorkCompleteSound();
+				playWorkDoneSound();
 				toggleProcessButton(false);
 			}
 			return;
@@ -1024,150 +1021,149 @@ async function executeAllNewTasks() {
 	}
 }
 
-function playWorkCompleteSound() {if(conf.scriptSettings.notificationSound.value) c_audio_base64.play()}
+function playWorkDoneSound() {if(Conf.settings.notifSound.value) DoneAudio.play()}
 
-function editSetting() {
-	let setStore = conf.ui.settingsStorage, setIdx = setStore.selectedIndex,
-	setOpt = setStore.options[setIdx], setKey = setOpt.innerHTML;
-	if(setKey == c_defaultTextStoredSettings) return;
-	awqDebug(`editSettings: index ${setIdx}`);
+function editPreset() {
+	let ss = Conf.ui.presetList;
+	if(!ss.value.length) return;
+	let oldKey = ss.options[ss.selectedIndex].text;
+	awqDebug(`editPreset ${oldKey}`);
 
-	//TODO Add to stylesheet instead of fixed style
 	document.body.style.overflow = 'hidden';
-	let editCont = utils.mkDiv(document.body, null, {position:'fixed', left:0,
-		bottom:0, width:'100vw', height:'100vh', background:'#000', zIndex:9999});
+	let editCont = utils.mkDiv(document.body, 'awq-json-editor'),
+	keyInput = utils.mkEl('input', editCont);
+	keyInput.title = "Name of the set";
 
-	let txtInput = utils.mkEl('input', editCont, null, {width:'100vw', height:'10vh'});
-	txtInput.title = "Name of the settins set (do not remove the prefix)";
+	let dataInput = utils.mkEl('textarea', editCont);
+	dataInput.title = "Data in JSON format";
 
-	let txtArea = utils.mkEl('textarea', editCont, null, {width:'100vw', height:'80vh'});
-	txtArea.title = `The set of settings i JSON format (Edit the value inside the "" but leave structure intact, an entire propertey: "id":"value" can also be removed if you do not want this setting set to make any changes to that setting)`;
-
-	let editBtn = utils.mkEl('button', editCont, null, {width:'50vw', height:'10vh'}, "OK");
+	let btnCont = utils.mkDiv(editCont),
+	editBtn = utils.mkEl('button', btnCont, null, null, "OK");
 	editBtn.title = "Save changes";
 	editBtn.onclick = () => {
 		//Validate
-		if(txtInput.value.length < 1) return alert('Name is missing');
-		if(!isJsonString(txtArea.value)) return alert('Value is invalid JSON');
-		if(!['t2i-', 'i2i-', 'ext-'].includes(txtInput.value.slice(0, 4)))
-			return alert('Name does not have valid prefix (t2i-, i2i-, ext-)');
+		let key = keyInput.value, data = dataInput.value;
+		if(keyInput.value.length < 1) return alert('Name is required');
+		data = parseJSON(data, true);
+		if(!data) return alert('Oops, invalid JSON');
 
 		//Remove overlay
 		document.body.style.overflow = '';
 		editCont.remove();
 
 		//Update data and refresh UI
-		awqDebug(`editSettings: updating ${setKey} ${setKey==txtInput.value?'':' to '+txtInput.value}`);
-		delete conf.savedSetting[setKey];
-		conf.savedSetting[txtInput.value] = txtArea.value;
-		localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-		refreshSettings();
+		awqDebug(`editPreset: updating ${oldKey} ${key===oldKey?'':' to '+key}`);
+		delete Conf.presets[oldKey];
+		Conf.presets[key] = data;
+		savePresets();
 
 		//Select option again
-		let opt = Array.from(setStore.options).find(item => item.text === txtInput.value);
+		let opt = Array.from(ss.options).find(el => el.text===key);
 		opt.selected = true;
 	}
 
-	let rstBtn = utils.mkEl('button', editCont, null, {width:'50vw', height:'10vh'}, "Reset");
+	let rstBtn = utils.mkEl('button', btnCont, null, null, "Reset");
 	rstBtn.title = "Revert changes";
 	(rstBtn.onclick = () => {
-		txtArea.value = conf.ui.settingsStorage.options[setIdx].value;
-		txtInput.value = conf.ui.settingsStorage.options[setIdx].text;
+		keyInput.value = oldKey;
+		dataInput.value = JSON.stringify(Conf.presets[oldKey]);
 	})();
 }
 
-function saveSettings() {
-	if(conf.ui.settingName.value.length < 1) return alert('Missing name');
-	if(conf.savedSetting.hasOwnProperty(conf.ui.settingName.value)) return alert('Duplicate name');
-	let settingSetName = conf.commonData.activeType + '-' + conf.ui.settingName.value;
-	conf.savedSetting[settingSetName] = getValueJSON();
-	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-	awqLog(`Saved new setting set ${settingSetName}`);
-	refreshSettings();
+function addPreset() {
+	if(Conf.ui.presetName.value.length < 1) return alert('Missing name');
+	if(Conf.ui.presetName.value in Conf.presets) return alert('Duplicate name');
+	let key = Conf.common.activeType + '-' + Conf.ui.presetName.value;
+	Conf.presets[key] = getValueJSON();
+	awqLog(`Saved new preset ${key}`);
+	savePresets();
 }
-function refreshSettings() {
-	let len = Object.keys(conf.savedSetting).length;
-	awqDebug(`refreshSettings: saved settings:${len}`);
-	conf.ui.settingName.value = conf.ui.settingsStorage.textContent = '';
-	for(let prop in conf.savedSetting) utils.mkEl('option',
-		conf.ui.settingsStorage, null, null, prop).value = conf.savedSetting[prop];
-	if(len < 1) utils.mkEl('option', conf.ui.settingsStorage,
-		null, null, c_defaultTextStoredSettings).value = "";
+function refreshPresets() {
+	let len = Object.keys(Conf.presets).length;
+	awqDebug(`refreshPresets ${len}`);
+	Conf.ui.presetName.value = Conf.ui.presetList.textContent = '';
+	if(len < 1) utils.mkEl('option', Conf.ui.presetList, null, null, "Stored settings").value = '';
+	else for(let prop in Conf.presets) utils.mkEl('option', Conf.ui.presetList, null, null, prop).value = '1';
 }
-async function loadSetting() {
-	if(conf.ui.settingsStorage.value.length < 1) return;
-	let itemName = conf.ui.settingsStorage.options[conf.ui.settingsStorage.selectedIndex].text;
-	awqDebug(`loadSetting: ${itemName}`);
-	await loadJson(conf.ui.settingsStorage.value);
+async function loadPreset() {
+	let ss = Conf.ui.presetList;
+	if(!ss.value.length) return;
+	let key = ss.options[ss.selectedIndex].text;
+	awqDebug(`loadPreset ${key}`);
+	await loadJSON(Conf.presets[key]);
 }
-function clearSetting() {
-	let ss = conf.ui.settingsStorage;
-	if(ss.value.length < 1) return;
-	awqLog(`Removed setting ${ss.options[ss.selectedIndex].innerHTML}`);
-	delete conf.savedSetting[ss.options[ss.selectedIndex].innerHTML];
-	ss.options[ss.selectedIndex].remove();
-	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-	if(ss.value.length < 1) refreshSettings();
+function clearPreset() {
+	let ss = Conf.ui.presetList;
+	if(!ss.value.length) return;
+	let opt = ss.options[ss.selectedIndex], key = opt.text;
+	awqLog(`Removed preset ${key}`);
+	delete Conf.presets[key];
+	opt.remove();
+	savePresets(ss.value.length);
+}
+function savePresets(noRefresh) {
+	localStorage.awqPresets = JSON.stringify(Conf.presets);
+	if(!noRefresh) refreshPresets();
 }
 
-function clickStartButton(p_type) {
-	const c_max_time_to_wait = 100;
-	let targetButton = conf[conf.commonData.activeType].controls.genrateButton.el;
-	awqDebug(`clickStartButton: working ${conf.commonData.working} waiting ${conf.commonData.working} type ${p_type}`);
-	if(conf.commonData.waiting) return;
-	targetButton.click();
-	conf.commonData.waiting = true;
-	return new Promise(resolve => {
-		let retryCount = 0;
-		let waitForSwitchInterval = setInterval(() => {
-			++retryCount;
-			if(retryCount >= c_max_time_to_wait) {
-				targetButton.click(); retryCount = 0;
-				awqDebug(`Work has not started after ${c_max_time_to_wait / 10} seconds, clicked again`);
+function clickStartButton(type) {
+	awqDebug(`clickStartButton ${type}`);
+	if(Conf.common.waiting || !Conf.common.processing) return;
+	let btn = Conf[Conf.common.activeType].controls.genrateButton.el,
+	maxTry = WaitForStart / TickDelay;
+	btn.click();
+	Conf.common.waiting = true;
+	return new Promise((res, rej) => {
+		let retryCount = 0, tmr = setInterval(() => {
+			if(!Conf.common.processing) {
+				clearInterval(tmr), rej("Work cancelled");
 			}
-			if(!webUICurrentyWorkingOn(p_type)) return;
-			conf.commonData.waiting = false;
+			if(++retryCount >= maxTry) {
+				btn.click(), retryCount = 0;
+				awqDebug(`Work has not started after ${WaitForStart/1000} seconds, clicked again`);
+			}
+			if(!webUICurrentyWorkingOn(type)) return;
+			Conf.common.waiting = false;
 			awqDebug('clickStartButton: work has started');
-			clearInterval(waitForSwitchInterval);
-			resolve();
-		}, c_wait_tick_duration);
+			clearInterval(tmr), res();
+		}, TickDelay);
 	});
 }
 
-function switchTabAndWait(p_type) {
-	if(p_type == conf.commonData.activeType) return;
-	awqDebug(`switchTabAndWait:${p_type}`);
-	conf.shadowDOM.root.querySelector(conf[p_type].controls.tabButton.sel).click(); //Using .el doesn't work
-	conf.commonData.waiting = true;
+function switchTabAndWait(type) {
+	if(type == Conf.common.activeType) return;
+	awqDebug(`switchTabAndWait ${type}`);
+	Conf.shadowDOM.root.querySelector(Conf[type].controls.tabButton.sel).click(); //Using .el doesn't work
+	Conf.common.waiting = true;
 	return new Promise(resolve => {
-		let startingTab = conf.commonData.activeType;
+		let startingTab = Conf.common.activeType;
 		let waitForSwitchInterval = setInterval(() => {
-			if(conf.commonData.activeType !== p_type) return;
-			conf.commonData.waiting = false;
-			awqLog(`Switched active tab from ${startingTab} to ${conf.commonData.activeType}`);
+			if(Conf.common.activeType !== type) return;
+			Conf.common.waiting = false;
+			awqLog(`Switched active tab from ${startingTab} to ${Conf.common.activeType}`);
 			clearInterval(waitForSwitchInterval);
 			resolve();
-		}, c_wait_tick_duration);
+		}, TickDelay);
 	});
 }
 
-function switchTabAndWaitUntilSwitched(p_targetTabName, p_tabConfig) {
-	awqDebug(`switchTabAndWaitUntilSwitched: p_target:${p_targetTabName} p_config:${p_tabConfig}`);
-	let targetTabConf = p_tabConfig.filter((elem) => {return elem.name == p_targetTabName})[0];
+function switchTabAndWaitUntilSwitched(targetTabName, tabConfig) {
+	awqDebug(`switchTabAndWaitUntilSwitched: target=${targetTabName} config=${tabConfig}`);
+	let targetTabConf = tabConfig.filter((elem) => {return elem.name == targetTabName})[0];
 	function correctTabVisible() {
-		return conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display != 'none';
+		return Conf.shadowDOM.root.querySelector(targetTabConf.containerSel).style.display != 'none';
 	}
 	if(correctTabVisible()) return;
-	conf.shadowDOM.root.querySelector(targetTabConf.buttonSel).click();
-	conf.commonData.waiting = true;
+	Conf.shadowDOM.root.querySelector(targetTabConf.buttonSel).click();
+	Conf.common.waiting = true;
 	return new Promise(resolve => {
 		let waitForSwitchInterval = setInterval(() => {
 			if(!correctTabVisible()) return;
-			conf.commonData.waiting = false;
+			Conf.common.waiting = false;
 			awqDebug('switchTabAndWaitUntilSwitched: switch complete');
 			clearInterval(waitForSwitchInterval);
 			resolve();
-		}, c_wait_tick_duration);
+		}, TickDelay);
 	});
 }
 
@@ -1177,80 +1173,59 @@ function forceGradioUIUpdate() {
 	document.querySelector(someCheckboxInputSelector).click();
 }
 
-function webUICurrentyWorkingOn(p_itemType) {
-	if(p_itemType == 'i2i' || p_itemType == 't2i')
-		return conf[p_itemType].controls.skipButton.el.getAttribute('style') == 'display: block;';
-	return conf.ext.controls.loadingElement.el.innerHTML.length > 0;
+function webUICurrentyWorkingOn(type) {
+	if(type == 'i2i' || type == 't2i')
+		return Conf[type].controls.skipButton.el.getAttribute('style') == 'display: block;';
+	return Conf.ext.controls.loadingElement.el.innerHTML.length > 0;
 }
 
-function waitForTaskToComplete(p_itemType) {
-	awqDebug(`waitForTaskToComplete: Waiting to complete work for ${p_itemType}`);
-	conf.commonData.waiting = true;
+function waitForTaskToComplete(type) {
+	awqDebug(`waitForTaskToComplete: Waiting to complete work for ${type}`);
+	Conf.common.waiting = true;
 	return new Promise(resolve => {
 		let waitForCompleteInterval = setInterval(() => {
-			if(webUICurrentyWorkingOn(p_itemType)) return;
+			if(webUICurrentyWorkingOn(type)) return;
 			clearInterval(waitForCompleteInterval);
-			awqDebug(`Work is complete for ${p_itemType}`);
-			conf.commonData.waiting = conf.commonData.working = false;
+			awqDebug(`Work complete for ${type}`);
+			Conf.common.waiting = Conf.common.working = false;
 			resolve();
-		}, c_wait_tick_duration);
+		}, TickDelay);
 	});
 }
 
-function filterPrompt(p_prompt_text, p_neg) {
-	let newPromptText = p_prompt_text;
-	let promptFilter = conf.scriptSettings.promptFilter.value.length > 0 ?
-		JSON.parse(conf.scriptSettings.promptFilter.value) : [];
-
-	for(let i = 0; i < promptFilter.length; ++i) {
-		if(!promptFilter[i].hasOwnProperty('pattern') ||
-			!promptFilter[i].hasOwnProperty('flags') ||
-			!promptFilter[i].hasOwnProperty('replace')) continue;
-
-		let regEx = new RegExp(promptFilter[i].pattern, promptFilter[i].flags);
-		let tmpNewPromptText = newPromptText.replace(regEx, promptFilter[i].replace);
-		if(tmpNewPromptText !== newPromptText) {
-			let changesCount = levenshteinDist(newPromptText, tmpNewPromptText);
-			awqLog(`Filtered ${p_neg ? '(neg)' : ''}prompt with filter (${promptFilter[i].desc}), ${changesCount} char changes`);
-			awqDebug(`Filtered from:<pre>${newPromptText}</pre>to:<pre>${tmpNewPromptText}</pre>`);
-			newPromptText = tmpNewPromptText;
+function filterPrompt(promptText, neg) {
+	let filter = Conf.settings.filter.value || [];
+	for(let f of filter) {
+		if(!('pattern' in f && 'flags' in f && 'replace' in f)) continue;
+		let regEx = new RegExp(f.pattern, f.flags),
+		tmpPrompt = promptText.replace(regEx, f.replace);
+		if(tmpPrompt !== promptText) {
+			let changesCount = levenshteinDist(promptText, tmpPrompt);
+			awqLog(`Filtered ${neg ? '(neg)' : ''}prompt with filter (${f.desc}), ${changesCount} char changes`);
+			awqDebug(`Filtered from:<pre>${promptText}</pre>to:<pre>${tmpPrompt}</pre>`);
+			promptText = tmpPrompt;
 		}
 	}
-	return newPromptText;
+	return promptText;
 }
 
 function exportImport(input) {
-	let exportJSON = JSON.stringify({
-		savedSetting: conf.savedSetting,
-		currentQueue: conf.currentQueue,
-		scriptSettings: JSON.parse(localStorage.awqScriptSettings) //Use localstorage since it has filtered everything except values
-	});
-	let importJSON = input.value;
-	if(importJSON.length < 1) {
+	let json = input.value.trim();
+	if(json) { //Import
+		json = parseJSON(json);
+		if(!json) return alert('Oops, invalid JSON');
+		localStorage.awqPresets = JSON.stringify(json.presets);
+		localStorage.awqQueue = JSON.stringify(json.queue);
+		localStorage.awqSettings = JSON.stringify(json.settings);
+		location.reload();
+	} else { //Export
+		input.value = JSON.stringify({
+			presets: Conf.presets, queue: getCurrentQueue(),
+			settings: JSON.parse(localStorage.awqSettings)
+		});
 		awqLog('Exported script data');
-		input.value = exportJSON;
 		input.focus(), input.select();
-		return;
 	}
-	if(!isJsonString(importJSON)) return alert('There is something wrong with the import data provided');
-	if(exportJSON == importJSON) return alert('The input data is the same as the current script data');
-	awqDebug('Data has changed');
-	let parsedImportJSON = JSON.parse(importJSON);
-	conf.savedSetting = parsedImportJSON.savedSetting;
-	conf.currentQueue = parsedImportJSON.currentQueue;
-	loadScriptSettings(parsedImportJSON.scriptSettings); //Load with loadScriptSettings to only replace values
-	localStorage.awqScriptSettings = JSON.stringify(parsedImportJSON.scriptSettings);
-	localStorage.awqSavedSetting = JSON.stringify(conf.savedSetting);
-	localStorage.awqCurrentQueue = JSON.stringify(conf.currentQueue);
-	location.reload();
-}
-function isJsonString(str) {
-	try {JSON.parse(str)} catch(e) {return false}
-	return true;
-}
-function getCallStack() {
-	try {throw new Error()}
-	catch(err) {return err.stack.replace(/^getCallStack.*\n/, '')}
 }
 
 function levenshteinDist(s1, s2) {
@@ -1273,124 +1248,123 @@ function levenshteinDist(s1, s2) {
 				}
 			}
 			return b;
-		} else return s1_len + s2_len;
+		}
+		return s1_len + s2_len;
 	}
 }
 
-function getValueJSON(p_type) {
-	let type = p_type || conf.commonData.activeType;
-	awqDebug(`getValueJSON: type:${type}`);
-	let valueJSON = {type: type};
+function getValueJSON(type) {
+	if(!type) type = Conf.common.activeType;
+	awqDebug(`getValueJSON ${type}`);
+	let json = {type: type};
 
 	if(type == 'ext') { //Needs special saving since it's not an input but a tab switch
-		valueJSON.extrasMode = conf.ext.controls.extrasMode.filter((elem) => {
-			return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
+		json.extrasMode = Conf.ext.controls.extrasMode.filter((elem) => {
+			return Conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
 		})[0].name;
-		valueJSON.extrasResizeMode = conf.ext.controls.extrasResizeMode.filter((elem) => {
-			return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
+		json.extrasResizeMode = Conf.ext.controls.extrasResizeMode.filter((elem) => {
+			return Conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
 		})[0].name;
 	} else if(type == 'i2i') { //Needs special saving since it's not an input but a tab switch
-		valueJSON.i2iMode = conf.i2i.controls.i2iMode.filter((elem) => {
-			return conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
+		json.i2iMode = Conf.i2i.controls.i2iMode.filter((elem) => {
+			return Conf.shadowDOM.root.querySelector(elem.containerSel).style.display != 'none'
 		})[0].name;
 	} else if(type == 'iBrowser') {
-		return conf.extensions.iBrowser.functions.getValueJSON();
+		return Conf.extensions.iBrowser.functions.getValueJSON();
 	}
 
-	for(let prop in conf[type]) {
+	for(let prop in Conf[type]) {
 		if(prop !== 'controls') {
 			try {
-				if(conf[type][prop].gradEl) {
-					valueJSON[prop] = getGradVal(conf[type][prop].gradEl);
-				} else if(conf[type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
-					valueJSON[prop] = conf[type][prop].el.classList.contains('input-accordion-open');
-				} else if(conf[type][prop].el.type == 'fieldset') { //Radio buttons
-					valueJSON[prop] = conf[type][prop].el.querySelector('input:checked').value;
-				} else if(conf[type][prop].el.type == 'checkbox') {
-					valueJSON[prop] = conf[type][prop].el.checked;
+				if(Conf[type][prop].gradEl) {
+					json[prop] = getGradVal(Conf[type][prop].gradEl);
+				} else if(Conf[type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
+					json[prop] = Conf[type][prop].el.classList.contains('input-accordion-open');
+				} else if(Conf[type][prop].el.type == 'fieldset') { //Radio buttons
+					json[prop] = Conf[type][prop].el.querySelector('input:checked').value;
+				} else if(Conf[type][prop].el.type == 'checkbox') {
+					json[prop] = Conf[type][prop].el.checked;
 				} else { //Inputs, Textarea
-					valueJSON[prop] = conf[type][prop].el.value;
-					if(prop == 'prompt') valueJSON[prop] = filterPrompt(valueJSON[prop]);
-					if(prop == 'negPrompt' && conf.scriptSettings.promptFilterNegative.value) valueJSON[prop] = filterPrompt(valueJSON[prop], true);
+					json[prop] = Conf[type][prop].el.value;
+					if(prop == 'prompt') json[prop] = filterPrompt(json[prop]);
+					if(prop == 'negPrompt' && Conf.settings.filterNeg.value) json[prop] = filterPrompt(json[prop], true);
 				}
 			} catch(e) {
-				awqErr(`Failed to retrieve settings for ${type} item ${prop} with error ${e.message}: <pre>${e.stack}</pre>`);
+				awqErr(`Failed to retrieve settings for ${type} item ${prop} with error ${e.message}:<pre>${e.stack}</pre>`);
 			}
 		}
 	}
-
-	valueJSON.sdModelCheckpoint = getGradVal(conf.commonData.sdModelCheckpoint.gradEl);
-	return JSON.stringify(valueJSON);
+	json.sdModelCheckpoint = getGradVal(Conf.common.sdModelCheckpoint.gradEl);
+	return json;
 }
-async function loadJson(p_json) {
-	let inputJSONObject = JSON.parse(p_json);
-	let type = inputJSONObject.type ? inputJSONObject.type : conf.commonData.activeType;
-	let oldData = JSON.parse(getValueJSON(type));
-	awqDebug(`loadJson:${type}`);
+async function loadJSON(data) {
+	if(typeof data !== 'object' || !Conf[data.type]) {
+		let e = "Invalid JSON data:\n"+data;
+		awqErr(e); throw e;
+	}
+	let verbose = Conf.settings.verbose.value,
+	oldData = verbose ? getValueJSON(data.type) : 0;
+	awqDebug(`loadJson ${data.type}`);
 
-	let currentModel = getGradVal(conf.commonData.sdModelCheckpoint.gradEl);
-	if(currentModel == inputJSONObject.sdModelCheckpoint) {
-		awqDebug(`loadJson: Correct model already loaded:${currentModel}`);//No action needed
-	} else if(conf.commonData.sdModelCheckpoint.gradEl.props.choices.includes(inputJSONObject.sdModelCheckpoint)) { //Check if model exists
-		awqDebug(`loadJson: Trying to load model:${inputJSONObject.sdModelCheckpoint}`);
-		setGradVal(conf.commonData.sdModelCheckpoint.gradEl, inputJSONObject.sdModelCheckpoint);
-		setCheckpointWithPost(inputJSONObject.sdModelCheckpoint); //Only setting gradio config no longer works?
+	let currentModel = getGradVal(Conf.common.sdModelCheckpoint.gradEl);
+	if(currentModel == data.sdModelCheckpoint) {
+		awqDebug(`loadJson: Correct model already loaded: ${currentModel}`);//No action needed
+	} else if(Conf.common.sdModelCheckpoint.gradEl.props.choices.includes(data.sdModelCheckpoint)) { //Check if model exists
+		awqDebug(`loadJson: Trying to load model: ${data.sdModelCheckpoint}`);
+		setGradVal(Conf.common.sdModelCheckpoint.gradEl, data.sdModelCheckpoint);
+		setCheckpointWithPost(data.sdModelCheckpoint); //Only setting gradio config no longer works?
 	} else {
-		awqErr(`Model ${inputJSONObject.sdModelCheckpoint} was not found, using current model ${currentModel}`);
+		let e = `Model ${data.sdModelCheckpoint} was not found, using current model ${currentModel}`;
+		awqErr(e); throw e;
 	}
 
-	if(conf.commonData.activeType != inputJSONObject.type) await switchTabAndWait(inputJSONObject.type); //Switch tab?
+	if(Conf.common.activeType !== data.type) await switchTabAndWait(data.type); //Switch tab?
 
-	if(inputJSONObject.extrasResizeMode) await switchTabAndWaitUntilSwitched(inputJSONObject.extrasResizeMode, conf.ext.controls.extrasResizeMode); //Needs special loading since it's not an input but a tab switch
-	if(inputJSONObject.extrasMode) await switchTabAndWaitUntilSwitched(inputJSONObject.extrasMode, conf.ext.controls.extrasMode); //Needs special loading since it's not an input but a tab switch
-
-	if(inputJSONObject.i2iMode) await switchTabAndWaitUntilSwitched(inputJSONObject.i2iMode, conf.i2i.controls.i2iMode); //Needs special loading since it's not an input but a tab switch
+	//Needs special loading since it's not an input but a tab switch
+	if(data.extrasResizeMode) await switchTabAndWaitUntilSwitched(data.extrasResizeMode, Conf.ext.controls.extrasResizeMode);
+	if(data.extrasMode) await switchTabAndWaitUntilSwitched(data.extrasMode, Conf.ext.controls.extrasMode);
+	if(data.i2iMode) await switchTabAndWaitUntilSwitched(data.i2iMode, Conf.i2i.controls.i2iMode);
 
 	let loadOutput = 'loadJson: loaded: ';
-
-	for(let prop in inputJSONObject) {
+	for(let prop in data) {
 		let triggerOnBaseElem = true;
 		if(['type', 'extrasMode', 'extrasResizeMode', 'sdModelCheckpoint', 'i2iMode'].includes(prop)) continue;
 		try {
-			if(oldData[prop] != inputJSONObject[prop]) loadOutput += `${prop}:${oldData[prop]}-->${inputJSONObject[prop]} | `;
-
-			if(conf[type][prop].el) {
-				if(conf[type][prop].el.type == 'fieldset') {
+			if(verbose && oldData[prop] != data[prop]) loadOutput += `${prop}:${oldData[prop]}-->${data[prop]} | `;
+			if(Conf[data.type][prop].el) {
+				if(Conf[data.type][prop].el.type == 'fieldset') {
 					triggerOnBaseElem = false; //No need to trigger this on base element
-					conf[type][prop].el.querySelector(`[value="${inputJSONObject[prop]}"]`).checked = true;
-					triggerChange(conf[type][prop].el.querySelector(`[value="${inputJSONObject[prop]}"]`));
-				} else if(conf[type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
-					let currentValue = conf[type][prop].el.classList.contains('input-accordion-open');
-					if(inputJSONObject[prop] != currentValue) {
-						conf[type][prop].el.querySelector('.label-wrap').click();
-					}
-
-				} else if(conf[type][prop].el.type == 'select-one') { //Select
-					if(conf[type][prop].el.checked == inputJSONObject[prop]) triggerOnBaseElem = false; //Not needed
-					conf[type][prop].el.value = inputJSONObject[prop];
-				} else if(conf[type][prop].el.type == 'checkbox') {
-					if(conf[type][prop].el.checked == inputJSONObject[prop]) triggerOnBaseElem = false; //Prevent checbox getting toggled
-					conf[type][prop].el.checked = inputJSONObject[prop];
+					Conf[data.type][prop].el.querySelector(`[value="${data[prop]}"]`).checked = true;
+					triggerChange(Conf[data.type][prop].el.querySelector(`[value="${data[prop]}"]`));
+				} else if(Conf[data.type][prop].el.classList.contains('input-accordion')) { //"input-accordion" (checkbox alternative)
+					let currentValue = Conf[data.type][prop].el.classList.contains('input-accordion-open');
+					if(data[prop] != currentValue) Conf[data.type][prop].el.querySelector('.label-wrap').click();
+				} else if(Conf[data.type][prop].el.type == 'select-one') { //Select
+					if(Conf[data.type][prop].el.checked == data[prop]) triggerOnBaseElem = false; //Not needed
+					Conf[data.type][prop].el.value = data[prop];
+				} else if(Conf[data.type][prop].el.type == 'checkbox') {
+					if(Conf[data.type][prop].el.checked == data[prop]) triggerOnBaseElem = false; //Prevent checbox getting toggled
+					Conf[data.type][prop].el.checked = data[prop];
 				} else { //Input, Textarea
-					if(conf[type][prop].el.value == inputJSONObject[prop]) triggerOnBaseElem = false; //Fixes svelte error
-					conf[type][prop].el.value = inputJSONObject[prop];
+					if(Conf[data.type][prop].el.value == data[prop]) triggerOnBaseElem = false; //Fixes svelte error
+					Conf[data.type][prop].el.value = data[prop];
 				}
-				if(conf[type][prop].el2) {
-					let triggerForSel2 = conf[type][prop].sel2.value != inputJSONObject[prop];
-					conf[type][prop].el2.value = inputJSONObject[prop];
-					if(triggerForSel2) triggerChange(conf[type][prop].el2);
+				if(Conf[data.type][prop].el2) {
+					let triggerForSel2 = Conf[data.type][prop].sel2.value != data[prop];
+					Conf[data.type][prop].el2.value = data[prop];
+					if(triggerForSel2) triggerChange(Conf[data.type][prop].el2);
 				}
 			}
-			if(conf[type][prop].gradEl) {
-				setGradVal(conf[type][prop].gradEl, inputJSONObject[prop]);
+			if(Conf[data.type][prop].gradEl) {
+				setGradVal(Conf[data.type][prop].gradEl, data[prop]);
 				triggerOnBaseElem = false;
 			}
-			if(triggerOnBaseElem) triggerChange(conf[type][prop].el);
+			if(triggerOnBaseElem) triggerChange(Conf[data.type][prop].el);
 		} catch(e) {
-			awqErr(`Failed to load settings for ${type} item ${prop} with error ${e.message}: <pre>${e.stack}</pre>`);
+			awqErr(`Failed to load settings for ${data.type} item ${prop} with error ${e.message}:<pre>${e.stack}</pre>`);
 		}
 	}
-	awqDebug(loadOutput.replace(/\|\s$/, ''));
+	if(verbose) awqDebug(loadOutput.replace(/\|\s$/, ''));
 	forceGradioUIUpdate();
 }
 
@@ -1409,12 +1383,12 @@ function waitForElm(selector) {
 		observer.observe(document.body, {childList: true, subtree: true});
 	});
 }
-function setCheckpointWithPost(p_target_cp) {
-	awqDebug(`setCheckpointWithPost:${p_target_cp}`);
-	let targetCheckpoint = p_target_cp.replace('/', '//').replace('\\', '\\\\');
+function setCheckpointWithPost(target_cp) {
+	awqDebug(`setCheckpointWithPost ${target_cp}`);
+	target_cp = target_cp.replace('/', '//').replace('\\', '\\\\');
 
 	//Try to find fn_index for the switch checkpoint "function"
-	let checkPointGradioElemId = conf.commonData.sdModelCheckpoint.gradEl.id;
+	let checkPointGradioElemId = Conf.common.sdModelCheckpoint.gradEl.id;
 	let fnIndex = gradio_config.dependencies.filter(comp => comp.inputs[0] == checkPointGradioElemId);
 	fnIndex = fnIndex ? gradio_config.dependencies.indexOf(fnIndex[0]) : null;
 	if(fnIndex) awqDebug(`setCheckpointWithPost: found fn_index ${fnIndex}`);
@@ -1422,30 +1396,39 @@ function setCheckpointWithPost(p_target_cp) {
 
 	fetch("/run/predict", {
 		method: "POST", headers: {"Content-Type": "application/json"}, redirect: "follow",
-		body: `{"fn_index":${fnIndex},"data":["${targetCheckpoint}"],"event_data":null,"session_hash":"trlwn215an"}`
+		body: `{"fn_index":${fnIndex},"data":["${target_cp}"],"event_data":null,"session_hash":"trlwn215an"}`
 	}).then(response => {
 		awqDebug(`setCheckpointWithPost: repsonse: ${response.status}-${response.statusText}: ${JSON.stringify(response.json())}`);
 	}).catch(error => {
 		awqDebug(`setCheckpointWithPost: error: ${JSON.stringify(error)}`);
-	});;
+	});
 }
 
-function triggerChange(p_elem) {
-	let evt = document.createEvent("HTMLEvents");
-	evt.initEvent("change", false, true); //Needed for script to update subsection
-	p_elem.dispatchEvent(evt);
-	evt = document.createEvent("HTMLEvents");
-	evt.initEvent("input", false, true); //Needded for webui to register changed settings
-	p_elem.dispatchEvent(evt);
+function triggerChange(elem) {
+	let evt = document.createEvent('HTMLEvents');
+	evt.initEvent('change', false, true); //Needed for script to update subsection
+	elem.dispatchEvent(evt);
+	evt = document.createEvent('HTMLEvents');
+	evt.initEvent('input', false, true); //Needded for webui to register changed settings
+	elem.dispatchEvent(evt);
 }
 
-function findGradioComponentState(p_elem_id) {
-	return gradio_config.components.filter(comp => comp.props.elem_id == p_elem_id);
+function findGradioComponentState(eid) {
+	return gradio_config.components.filter(comp => comp.props.elem_id == eid);
 }
-function findGradioComponentStateByLabel(p_elem_label) {
-	return gradio_config.components.filter(comp => comp.props.label == p_elem_label);
+function findGradioComponentStateByLabel(label) {
+	return gradio_config.components.filter(comp => comp.props.label == label);
 }
-function getGradVal(p_grad_comp) { return p_grad_comp.props.value; }
-function setGradVal(p_grad_comp, p_val) { p_grad_comp.props.value = p_val; }
+function getGradVal(grad) { return grad.props.value; }
+function setGradVal(grad, val) { grad.props.value = val; }
+
+function parseJSON(str, reqType) {
+	try {
+		str = JSON.parse(str);
+		if(typeof str !== 'object' || Array.isArray(str)) throw 'a';
+		if(reqType && !Conf[str.type]) throw 't';
+		return str;
+	} catch(e) {}
+}
 
 })();
